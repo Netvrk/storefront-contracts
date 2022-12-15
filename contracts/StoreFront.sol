@@ -2,15 +2,10 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
@@ -18,14 +13,12 @@ import "hardhat/console.sol";
 
 contract StoreFront is
     ERC2981,
-    ContextUpgradeable,
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable,
     ERC721EnumerableUpgradeable
 {
     using MerkleProofUpgradeable for bytes32[];
-    using AddressUpgradeable for address;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     address private _treasury;
@@ -81,7 +74,6 @@ contract StoreFront is
         __ERC721_init(name_, symbol_);
         __ERC721Enumerable_init();
         __UUPSUpgradeable_init();
-        __Context_init_unchained();
         __ReentrancyGuard_init_unchained();
         __AccessControl_init_unchained();
 
@@ -254,7 +246,7 @@ contract StoreFront is
     function withdraw() external virtual nonReentrant {
         require(address(this).balance > 0, "ZERO_BALANCE");
         uint256 balance = address(this).balance;
-        AddressUpgradeable.sendValue(payable(_treasury), balance);
+        payable(_treasury).transfer(balance);
     }
 
     /**
@@ -323,7 +315,7 @@ contract StoreFront is
                 MerkleProofUpgradeable.verify(
                     merkleProofs[i],
                     _presales[tierId].merkleRoot,
-                    keccak256(abi.encodePacked(_msgSender()))
+                    keccak256(abi.encodePacked(msg.sender))
                 ),
                 "USER_NOT_WHITELISTED"
             );
