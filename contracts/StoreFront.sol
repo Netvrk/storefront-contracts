@@ -172,6 +172,9 @@ contract StoreFront is
         require(saleStart < saleEnd, "INVALID_SALE_TIME");
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
 
+        // Stop presale
+        _presales[id].presaleEnd = block.timestamp;
+
         _sales[id] = Sale(id, saleStart, saleEnd);
         _tiers[id].maxSupply = maxSupply;
     }
@@ -186,7 +189,6 @@ contract StoreFront is
         require(id <= _totalTiers, "TIER_UNAVAILABLE");
         require(_sales[id].id != 0, "SALE_NOT_INITIALIZED");
         require(saleStart < saleEnd, "INVALID_SALE_TIME");
-
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
 
         _sales[id].saleStart = saleStart;
@@ -207,6 +209,9 @@ contract StoreFront is
         require(_presales[id].id == 0, "PRESALE_ALREADY_INITIALIZED");
         require(presaleStart < presaleEnd, "INVALID_PRESALE_TIME");
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
+
+        // Stop sale
+        _sales[id].saleEnd = block.timestamp;
 
         _presales[id] = PreSale(id, presaleStart, presaleEnd, merkleRoot_);
         _tiers[id].maxSupply = maxSupply;
