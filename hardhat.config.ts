@@ -17,8 +17,15 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    goerli: {
-      url: process.env.GOERLI_URL || "",
+    // goerli: {
+    //   url: process.env.GOERLI_URL || "",
+    //   accounts:
+    //     process.env.PRIVATE_KEY_1 !== undefined
+    //       ? [process.env.PRIVATE_KEY_1]
+    //       : [],
+    // },
+    mumbai: {
+      url: process.env.MUMBAI_URL || "",
       accounts:
         process.env.PRIVATE_KEY_1 !== undefined
           ? [process.env.PRIVATE_KEY_1]

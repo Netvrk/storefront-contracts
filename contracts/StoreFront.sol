@@ -126,8 +126,8 @@ contract StoreFront is
         require(maxSupply > 0, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(price > 0, "INVALID_PRICE");
-        _tiers[id] = Tier(id, price, maxSupply, 0, maxPerTx, maxPerWallet);
+        // start token id at 1 (for tokenId naming consistency)
+        _tiers[id] = Tier(id, price, maxSupply, 1, maxPerTx, maxPerWallet);
         _totalTiers++;
     }
 
@@ -144,7 +144,6 @@ contract StoreFront is
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(price > 0, "INVALID_PRICE");
 
         _tiers[id].price = price;
         _tiers[id].maxSupply = maxSupply;
@@ -360,7 +359,8 @@ contract StoreFront is
 
         // Check if tier is sold out
         require(
-            tier.supply + tokenSize <= tier.maxSupply,
+            // add 1 to max supply since id starts at 1
+            tier.supply + tokenSize <= (tier.maxSupply + 1),
             "MAX_SUPPLY_EXCEEDED"
         );
 
