@@ -88,7 +88,6 @@ describe("Store Front ", function () {
     await expect(
       storeFront.initTier(101, ethers.utils.parseEther("1"), 20, 2, 5)
     ).to.be.revertedWith("TIER_UNAVAILABLE");
-
     await expect(
       storeFront.initTier(1, ethers.utils.parseEther("1"), 0, 2, 5)
     ).to.be.revertedWith("INVALID_SUPPLY");
@@ -213,8 +212,8 @@ describe("Store Front ", function () {
       value: ethers.utils.parseEther("6"),
     });
 
-    expect(await storeFront.tokenURI(1)).to.be.equal(
-      "https://api.example.com/1"
+    expect(await storeFront.tokenURI(101)).to.be.equal(
+      "https://api.example.com/101"
     );
   });
 
@@ -244,7 +243,8 @@ describe("Store Front ", function () {
         1,
         x
       );
-      expect(tokenId.toNumber()).to.be.equal(x * maxTiers + 1);
+
+      expect(tokenId.toNumber()).to.be.equal(maxTiers + x * maxTiers + 1);
     }
     const totalRevenue = await storeFront.totalRevenue();
     const balance = await ethers.provider.getBalance(storeFront.address);

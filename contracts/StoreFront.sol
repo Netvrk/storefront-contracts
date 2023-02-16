@@ -127,6 +127,7 @@ contract StoreFront is
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
         require(price > 0, "INVALID_PRICE");
+
         _tiers[id] = Tier(id, price, maxSupply, 0, maxPerTx, maxPerWallet);
         _totalTiers++;
     }
@@ -374,8 +375,8 @@ contract StoreFront is
         );
 
         // Mint tokens
-        for (uint256 j = 0; j < tokenSize; j++) {
-            uint256 tokenId = (tier.supply * _maxTiers) + tierId;
+        for (uint256 x = 0; x < tokenSize; x++) {
+            uint256 tokenId = _maxTiers + (tier.supply * _maxTiers) + tierId;
             _safeMint(to, tokenId);
             tier.supply++;
             _ownerTierTokens[to][tierId][
