@@ -100,13 +100,9 @@ describe("Store Front ", function () {
       storeFront.initTier(1, ethers.utils.parseEther("1"), 20, 2, 0)
     ).to.be.revertedWith("INVALID_MAX_PER_WALLET");
 
-    await expect(
-      storeFront.initTier(1, ethers.utils.parseEther("0"), 20, 2, 5)
-    ).to.be.revertedWith("INVALID_PRICE");
-
     await storeFront.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5);
 
-    await storeFront.initTier(2, ethers.utils.parseEther("1"), 20, 2, 5);
+    await storeFront.initTier(2, ethers.utils.parseEther("0"), 20, 2, 5);
 
     await storeFront.initTier(3, ethers.utils.parseEther("1"), 20, 2, 5);
 
@@ -198,7 +194,7 @@ describe("Store Front ", function () {
 
     await expect(
       storeFront.mint([1, 2, 3], [2, 2, 2], {
-        value: ethers.utils.parseEther("5"),
+        value: ethers.utils.parseEther("3"),
       })
     ).to.be.revertedWith("INSUFFICIENT_FUND");
 
@@ -285,10 +281,6 @@ describe("Store Front ", function () {
     await expect(
       storeFront.updateTier(1, ethers.utils.parseEther("1"), 20, 2, 0)
     ).to.be.revertedWith("INVALID_MAX_PER_WALLET");
-
-    await expect(
-      storeFront.updateTier(1, ethers.utils.parseEther("0"), 20, 2, 5)
-    ).to.be.revertedWith("INVALID_PRICE");
 
     await storeFront.updateTier(1, ethers.utils.parseEther("1"), 3, 2, 4);
 

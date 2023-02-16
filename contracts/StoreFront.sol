@@ -126,7 +126,6 @@ contract StoreFront is
         require(maxSupply > 0, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(price > 0, "INVALID_PRICE");
 
         _tiers[id] = Tier(id, price, maxSupply, 0, maxPerTx, maxPerWallet);
         _totalTiers++;
@@ -145,7 +144,6 @@ contract StoreFront is
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(price > 0, "INVALID_PRICE");
 
         _tiers[id].price = price;
         _tiers[id].maxSupply = maxSupply;
