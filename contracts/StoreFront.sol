@@ -126,8 +126,9 @@ contract StoreFront is
         require(maxSupply > 0, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        // start token id at 1 (for tokenId naming consistency)
-        _tiers[id] = Tier(id, price, maxSupply, 1, maxPerTx, maxPerWallet);
+        require(price > 0, "INVALID_PRICE");
+
+        _tiers[id] = Tier(id, price, maxSupply, 0, maxPerTx, maxPerWallet);
         _totalTiers++;
     }
 
@@ -144,6 +145,7 @@ contract StoreFront is
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
+        require(price > 0, "INVALID_PRICE");
 
         _tiers[id].price = price;
         _tiers[id].maxSupply = maxSupply;
@@ -359,8 +361,7 @@ contract StoreFront is
 
         // Check if tier is sold out
         require(
-            // add 1 to max supply since id starts at 1
-            tier.supply + tokenSize <= (tier.maxSupply + 1),
+            tier.supply + tokenSize <= tier.maxSupply,
             "MAX_SUPPLY_EXCEEDED"
         );
 
@@ -374,8 +375,8 @@ contract StoreFront is
         );
 
         // Mint tokens
-        for (uint256 j = 0; j < tokenSize; j++) {
-            uint256 tokenId = (tier.supply * _maxTiers) + tierId;
+        for (uint256 x = 0; x < tokenSize; x++) {
+            uint256 tokenId = _maxTiers + (tier.supply * _maxTiers) + tierId;
             _safeMint(to, tokenId);
             tier.supply++;
             _ownerTierTokens[to][tierId][
