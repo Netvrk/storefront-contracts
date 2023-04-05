@@ -84,6 +84,9 @@ contract ArchetypeAvatars is
 
     mapping(address => bool) private _nftPayWhitelist;
 
+    // address => tier => phase => minted?
+    mapping(address => mapping(uint256 => mapping(uint256 => bool))) private _minted;
+
     constructor(
       string memory name_,
       string memory symbol_,
@@ -366,6 +369,8 @@ contract ArchetypeAvatars is
       require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
       require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
 
+      require(!_minted[msg.sender][tokenTier][1], "ALREADY_MINTED_TIER_AND_PHASE");
+
       require(
         MerkleProof.verify(
           merkleProofs,
@@ -375,6 +380,8 @@ contract ArchetypeAvatars is
         "WHITELIST_VALUES_INCORRECT"
       );
 
+      _minted[msg.sender][tokenTier][1] = true;
+
       // Mint tier
       _mintTier(msg.sender, tokenTier, tierSize);
     }
@@ -383,25 +390,31 @@ contract ArchetypeAvatars is
     function mintPhase2 (
       uint256 tokenTier,
       uint256 tierSize,
-      uint256 price,
+      uint256 discount,
       bytes32[] calldata merkleProofs
     ) external virtual nonReentrant {
       require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
       require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
 
+      require(!_minted[msg.sender][tokenTier][2], "ALREADY_MINTED_TIER_AND_PHASE");
+
       require(
         MerkleProof.verify(
           merkleProofs,
           _presales[tokenTier].merkleRoot,
-          keccak256(abi.encodePacked(msg.sender, tierSize, price))
+          keccak256(abi.encodePacked(msg.sender, tierSize, discount))
         ),
         "WHITELIST_VALUES_INCORRECT"
       );
 
-      uint256 totalCost = price * tierSize;
+      Tier storage tier = _tiers[tokenTier];
+      uint256 discountedPrice = tier.price * ((100 - discount) / 100);
+      uint256 totalCost = discountedPrice * tierSize;
 
       // Transfer tokens
       require(IERC20(_paymentToken).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
+
+      _minted[msg.sender][tokenTier][2] = true;
 
       // Mint tier
       _mintTier(msg.sender, tokenTier, tierSize);
@@ -420,6 +433,8 @@ contract ArchetypeAvatars is
       require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
       require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
 
+      require(!_minted[msg.sender][tokenTier][3], "ALREADY_MINTED_TIER_AND_PHASE");
+
       require(
         MerkleProof.verify(
           merkleProofs,
@@ -436,6 +451,8 @@ contract ArchetypeAvatars is
       // Transfer tokens
       require(IERC20(_paymentToken).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
 
+      _minted[msg.sender][tokenTier][3] = true;
+
       // Mint tier
       _mintTier(msg.sender, tokenTier, tierSize);
 
@@ -451,6 +468,8 @@ contract ArchetypeAvatars is
     ) external virtual nonReentrant {
       require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
       require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
+
+      require(!_minted[msg.sender][tokenTier][3], "ALREADY_MINTED_TIER_AND_PHASE");
 
       PromoCode memory promoCode = _promoCodes[promoCodeHash];
       require(promoCode.active == true, 'PROMO_CODE_NOT_ACTIVE');
@@ -477,6 +496,8 @@ contract ArchetypeAvatars is
 
       // Transfer tokens
       require(IERC20(_paymentToken).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
+
+      _minted[msg.sender][tokenTier][3] = true;
 
       // Mint tier
       _mintTier(msg.sender, tokenTier, tierSize);
@@ -661,6 +682,10 @@ contract ArchetypeAvatars is
 
     function nftPayWhitelist(address nftPay) external view virtual returns (bool) {
         return _nftPayWhitelist[nftPay];
+    }
+
+    function minted(address wallet, uint256 tier, uint256 phase) external view virtual returns (bool) {
+        return _minted[wallet][tier][phase];
     }
 
     function tiers(
