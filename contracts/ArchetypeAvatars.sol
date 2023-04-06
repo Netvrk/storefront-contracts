@@ -508,6 +508,7 @@ contract ArchetypeAvatars is
     // Phase 4: Public sale w/ promo code option
 
     // no promo
+    // nft pay uses thi stoo
     function mintPhase4 (
       uint256 tokenTier,
       uint256 tierSize
@@ -558,28 +559,6 @@ contract ArchetypeAvatars is
       _mintTier(msg.sender, tokenTier, tierSize);
 
       _totalRevenue = _totalRevenue + (totalCost - influencerReward);
-    }
-
-    // Phase4, NFTpay
-    function mintPhase4WithNftPay (
-      uint256 tokenTier,
-      uint256 tierSize
-    ) external virtual nonReentrant {
-      require(_nftPayWhitelist[msg.sender], "SENDER_NOT_WHITELISTED");
-      require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-      require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
-      Tier storage tier = _tiers[tokenTier];
-
-      uint256 totalCost = tier.price * tierSize;
-
-      // Transfer tokens
-      require(IERC20(_paymentToken).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
-
-      // Mint tier
-      _mintTier(msg.sender, tokenTier, tierSize);
-
-      _totalRevenue = _totalRevenue + totalCost;
     }
     
     /**
