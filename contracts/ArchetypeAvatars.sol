@@ -79,8 +79,6 @@ contract ArchetypeAvatars is
     mapping(uint256 => Sale) private _sales;
 
     uint256 public airdropIndex;
-    uint256 public presaleIndex;
-    uint256 public saleIndex;
 
     mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
     mapping(address => mapping(uint256 => mapping(uint256 => uint256)))
@@ -103,9 +101,14 @@ contract ArchetypeAvatars is
 
     mapping(address => bool) private _nftPayWhitelist;
 
-    // address => phase => tier => minted?
-    mapping(address => mapping(uint256 => mapping(uint256 => bool)))
-        private _minted;
+    struct PhaseWhiteList {
+        uint256 maxMint;
+        uint256 discount;
+        uint256 minted;
+    }
+    // user => tier/release => phase => whitelist
+    mapping(address => mapping(uint256 => mapping(uint256 => PhaseWhiteList)))
+        private _phaseWhitelist;
 
     constructor(
         string memory name_,
@@ -124,8 +127,6 @@ contract ArchetypeAvatars is
         _paymentToken = paymentToken_;
 
         airdropIndex = 0;
-        presaleIndex = 0;
-        saleIndex = 0;
     }
 
     // Set NFT base URI
@@ -333,7 +334,7 @@ contract ArchetypeAvatars is
         require(maxRedeemable > 0, "MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0");
         require(
             _promoCodes[promoCodeHash].discount == 0,
-            "PROMO_CODE_ALREADY_EXISTS"
+            "PROMO_ALREADY_EXISTS"
         ); // TODO: better way to check if exists?
 
         _promoCodes[promoCodeHash] = PromoCode(
@@ -363,7 +364,7 @@ contract ArchetypeAvatars is
         require(maxRedeemable > 0, "MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0");
         require(
             _promoCodes[promoCodeHash].discount == 0,
-            "PROMO_CODE_ALREADY_EXISTS"
+            "PROMO_ALREADY_EXISTS"
         ); // TODO: better way to check if exists?
 
         _promoCodes[promoCodeHash] = PromoCode(
@@ -439,67 +440,109 @@ contract ArchetypeAvatars is
     ///////////////////////////////////////////////////
     */
 
-    /*
-     *********************
-     # PHASE 2: PRESALE
-     *********************
-     */
+    /* #################################################
+    ####################################################
+    ################## PHASE 1 #########################
+    ####################################################
+    */
+    function initPhase1(
+        uint256 tokenTier,
+        address[] memory recipients,
+        uint256[] memory freeClaims,
+        uint256 startTime,
+        uint256 endTime
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(
+            recipients.length == freeClaims.length,
+            "INVALID_RECIPIENTS_SIZE"
+        );
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_PRESALE_TIME");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            _phaseWhitelist[recipients[idx]][tokenTier][1] = PhaseWhiteList(
+                freeClaims[idx],
+                0,
+                0
+            );
+        }
+        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
+    }
 
     // Phase 1: Free claim for whitelisted addresses (address, max qty)
     function mintPhase1(
         uint256 tokenTier,
-        uint256 tierSize,
-        bytes32[] calldata merkleProofs
+        uint256 tierSize
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
         require(
-            !_minted[msg.sender][1][tokenTier],
-            "TIER_MINTED_FOR_THIS_PHASE"
-        );
-
-        require(
-            MerkleProof.verify(
-                merkleProofs,
-                _presales[tokenTier].merkleRoot,
-                keccak256(abi.encodePacked(msg.sender))
-            ),
+            _phaseWhitelist[msg.sender][tokenTier][1].maxMint > 0,
             "USER_NOT_WHITELISTED"
         );
-
-        // TODO: What should be the size of the tier?
-        // Mint tier
+        require(
+            _phaseWhitelist[msg.sender][tokenTier][1].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tokenTier][1].maxMint,
+            "MAX_MINT_EXCEEDED"
+        );
+        _phaseWhitelist[msg.sender][tokenTier][1].minted += tierSize;
         _mintTier(msg.sender, tokenTier, tierSize);
+    }
 
-        _minted[msg.sender][1][tokenTier] = true;
+    /*##################################################
+    ####################################################
+    ################## PHASE 2 #########################
+    ####################################################
+    */
+
+    function initPhase2(
+        uint256 tokenTier,
+        address[] memory recipients,
+        uint256[] memory freeClaims,
+        uint256[] memory discounts,
+        uint256 startTime,
+        uint256 endTime
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(
+            recipients.length == freeClaims.length,
+            "INVALID_RECIPIENTS_SIZE"
+        );
+        require(
+            recipients.length == discounts.length,
+            "INVALID_RECIPIENTS_SIZE"
+        );
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_PRESALE_TIME");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            _phaseWhitelist[recipients[idx]][tokenTier][2] = PhaseWhiteList(
+                freeClaims[idx],
+                discounts[idx],
+                0
+            );
+        }
+        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
     }
 
     // Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, price)
     function mintPhase2(
         uint256 tokenTier,
-        uint256 tierSize,
-        uint256 discount,
-        bytes32[] calldata merkleProofs
+        uint256 tierSize
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
         require(
-            !_minted[msg.sender][2][tokenTier],
-            "TIER_MINTED_FOR_THIS_PHASE"
-        );
-
-        require(
-            MerkleProof.verify(
-                merkleProofs,
-                _presales[tokenTier].merkleRoot,
-                keccak256(abi.encodePacked(msg.sender, discount))
-            ),
+            _phaseWhitelist[msg.sender][tokenTier][2].maxMint > 0,
             "USER_NOT_WHITELISTED"
+        );
+        require(
+            _phaseWhitelist[msg.sender][tokenTier][2].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tokenTier][2].maxMint,
+            "MAX_MINT_EXCEEDED"
         );
 
         // Calculate total cost
+        uint256 discount = _phaseWhitelist[msg.sender][tokenTier][2].discount;
         Tier storage tier = _tiers[tokenTier];
         uint256 discountedPrice = tier.price * ((100 - discount) / 100);
         uint256 totalCost = discountedPrice * tierSize;
@@ -517,93 +560,101 @@ contract ArchetypeAvatars is
             totalCost
         );
 
+        // Update Mint and revenue
+        _phaseWhitelist[msg.sender][tokenTier][2].minted += tierSize;
+        _totalRevenue = _totalRevenue + totalCost;
+
         // Mint tier
         _mintTier(msg.sender, tokenTier, tierSize);
-
-        _minted[msg.sender][2][tokenTier] = true;
-        _totalRevenue = _totalRevenue + totalCost;
     }
 
-    // Phase 3: Pre-sale for whitelisted address w/ promo code option (address)
+    /* #################################################
+    ####################################################
+    ################## PHASE 3 #########################
+    ####################################################
+    */
 
-    // Phase 3, no promo
+    function initPhase3(
+        uint256 tokenTier,
+        address[] memory recipients,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 maxPerWallet,
+        uint256 maxPerTx
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_PRESALE_TIME");
+        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
+        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            _phaseWhitelist[recipients[idx]][tokenTier][3] = PhaseWhiteList(
+                maxPerWallet,
+                0,
+                0
+            );
+        }
+        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
+        _tiers[tokenTier].maxPerTx = maxPerTx;
+        _tiers[tokenTier].maxPerWallet = maxPerWallet;
+    }
+
     function mintPhase3(
         uint256 tokenTier,
         uint256 tierSize,
-        bytes32[] calldata merkleProofs
-    ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
-        require(
-            !_minted[msg.sender][3][tokenTier],
-            "TIER_MINTED_FOR_THIS_PHASE"
-        );
-
-        require(
-            MerkleProof.verify(
-                merkleProofs,
-                _presales[tokenTier].merkleRoot,
-                keccak256(abi.encodePacked(msg.sender))
-            ),
-            "USER_NOT_WHITELISTED"
-        );
-
-        // Calculate total cost
-        Tier storage tier = _tiers[tokenTier];
-        uint256 totalCost = tier.price * tierSize;
-
-        // Transfer tokens
-        IERC20(_paymentToken).transferFrom(
-            msg.sender,
-            address(this),
-            totalCost
-        );
-
-        // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
-
-        _minted[msg.sender][3][tokenTier] = true;
-        _totalRevenue = _totalRevenue + totalCost;
-    }
-
-    // Phase 3, yes promo
-    function mintPhase3WithPromo(
-        uint256 tokenTier,
-        uint256 tierSize,
-        bytes32[] calldata merkleProofs,
         bytes32 promoCodeHash
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
         require(
-            !_minted[msg.sender][3][tokenTier],
-            "TIER_MINTED_FOR_THIS_PHASE"
-        );
-
-        PromoCode memory promoCode = _promoCodes[promoCodeHash];
-        require(promoCode.active == true, "PROMO_CODE_NOT_ACTIVE");
-        require(
-            promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
-            "PROMO_CODE_MAX_REDEEMABLE_EXCEEDED"
-        );
-        require(promoCode.tier == tokenTier, "PROMO_CODE_DOES_NOT_MATCH_TIER");
-
-        require(
-            MerkleProof.verify(
-                merkleProofs,
-                _presales[tokenTier].merkleRoot,
-                keccak256(abi.encodePacked(msg.sender))
-            ),
+            _phaseWhitelist[msg.sender][tokenTier][2].maxMint > 0,
             "USER_NOT_WHITELISTED"
+        );
+        require(
+            _phaseWhitelist[msg.sender][tokenTier][2].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tokenTier][2].maxMint,
+            "MAX_MINT_EXCEEDED"
         );
 
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
-        uint256 discountedPrice = tier.price *
-            ((100 - promoCode.discount) / 100);
-        uint256 totalCost = discountedPrice * tierSize;
+        uint256 totalCost = 0;
+        if (promoCodeHash.length > 0) {
+            PromoCode memory promoCode = _promoCodes[promoCodeHash];
+            require(promoCode.active == true, "PROMO_NOT_ACTIVE");
+            require(
+                promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
+                "PROMO_MAX_REDEEMABLE_EXCEEDED"
+            );
+            require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
+            uint256 discountedPrice = tier.price *
+                ((100 - promoCode.discount) / 100);
+            totalCost = discountedPrice * tierSize;
+
+            // Check if fund is sufficient
+            require(
+                IERC20(_paymentToken).balanceOf(msg.sender) >= totalCost,
+                "INSUFFICIENT_FUND"
+            );
+
+            // Update Revenue
+            uint256 influencerReward = (discountedPrice *
+                promoCode.commission) / 100;
+            _influencerBalances[promoCode.influencer] += influencerReward;
+            _promoCodes[promoCodeHash].totalRedeemed += tierSize;
+            _totalRevenue = _totalRevenue + (totalCost - influencerReward);
+        } else {
+            // Update Revenue
+            totalCost = tier.price * tierSize;
+
+            // Check if fund is sufficient
+            require(
+                IERC20(_paymentToken).balanceOf(msg.sender) >= totalCost,
+                "INSUFFICIENT_FUND"
+            );
+            // Update Revenue
+            _totalRevenue = _totalRevenue + totalCost;
+        }
 
         // Transfer tokens
         IERC20(_paymentToken).transferFrom(
@@ -612,87 +663,99 @@ contract ArchetypeAvatars is
             totalCost
         );
 
+        // Update Mint
+        _phaseWhitelist[msg.sender][tokenTier][3].minted += tierSize;
+
         // Mint tier
         _mintTier(msg.sender, tokenTier, tierSize);
-
-        _minted[msg.sender][3][tokenTier] = true;
-
-        // Distribute revenue
-        uint256 influencerReward = (discountedPrice * promoCode.commission) /
-            100;
-        _influencerBalances[promoCode.influencer] += influencerReward;
-        _promoCodes[promoCodeHash].totalRedeemed += tierSize;
-        _totalRevenue = _totalRevenue + (totalCost - influencerReward);
     }
 
-    // Phase 4: Public sale w/ promo code option
+    /* #################################################
+    ####################################################
+    ################## PHASE 4 #########################
+    ####################################################
+    */
 
-    // no promo
-    // nft pay uses this stoo
+    function initPhase4(
+        uint256 tokenTier,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 maxSupply,
+        uint256 maxPerWallet,
+        uint256 maxPerTx
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_SALE_TIME");
+        require(maxSupply > _tiers[tokenTier].supply, "INVALID_SUPPLY");
+        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
+        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
+
+        _sales[tokenTier] = Sale(tokenTier, startTime, endTime);
+        _tiers[tokenTier].maxPerTx = maxPerTx;
+        _tiers[tokenTier].maxPerWallet = maxPerWallet;
+        _tiers[tokenTier].maxSupply = maxSupply;
+    }
+
     function mintPhase4(
         uint256 tokenTier,
-        uint256 tierSize
-    ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
-        // Calculate total cost
-        Tier storage tier = _tiers[tokenTier];
-        uint256 totalCost = tier.price * tierSize;
-
-        // Transfer tokens
-        IERC20(_paymentToken).transferFrom(
-            msg.sender,
-            address(this),
-            totalCost
-        );
-
-        // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
-
-        _totalRevenue = _totalRevenue + totalCost;
-    }
-
-    // Phase4, yes promo
-    function mintPhase4WithPromo(
-        uint256 tokenTier,
         uint256 tierSize,
         bytes32 promoCodeHash
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
-
-        PromoCode memory promoCode = _promoCodes[promoCodeHash];
-        require(promoCode.active == true, "PROMO_CODE_NOT_ACTIVE");
-        require(
-            promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
-            "PROMO_CODE_MAX_REDEEMABLE_EXCEEDED"
-        );
-        require(promoCode.tier == tokenTier, "PROMO_CODE_DOES_NOT_MATCH_TIER");
+        require(_isSaleActive(tokenTier), "SALE_NOT_ACTIVE");
 
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
-        uint256 discountedPrice = tier.price *
-            ((100 - promoCode.discount) / 100);
-        uint256 totalCost = discountedPrice * tierSize;
+        uint256 totalCost = 0;
+        if (promoCodeHash.length > 0) {
+            PromoCode memory promoCode = _promoCodes[promoCodeHash];
+            require(promoCode.active == true, "PROMO_NOT_ACTIVE");
+            require(
+                promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
+                "PROMO_MAX_REDEEMABLE_EXCEEDED"
+            );
+            require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
+            uint256 discountedPrice = tier.price *
+                ((100 - promoCode.discount) / 100);
+            totalCost = discountedPrice * tierSize;
+
+            // Check if fund is sufficient
+            require(
+                IERC20(_paymentToken).balanceOf(msg.sender) >= totalCost,
+                "INSUFFICIENT_FUND"
+            );
+
+            // Update Revenue
+            uint256 influencerReward = (discountedPrice *
+                promoCode.commission) / 100;
+            _influencerBalances[promoCode.influencer] += influencerReward;
+            _promoCodes[promoCodeHash].totalRedeemed += tierSize;
+            _totalRevenue = _totalRevenue + (totalCost - influencerReward);
+        } else {
+            // Update Revenue
+            totalCost = tier.price * tierSize;
+
+            // Check if fund is sufficient
+            require(
+                IERC20(_paymentToken).balanceOf(msg.sender) >= totalCost,
+                "INSUFFICIENT_FUND"
+            );
+            // Update Revenue
+            _totalRevenue = _totalRevenue + totalCost;
+        }
 
         // Transfer tokens
-
         IERC20(_paymentToken).transferFrom(
             msg.sender,
             address(this),
             totalCost
         );
 
+        // Update Mint
+        _phaseWhitelist[msg.sender][tokenTier][3].minted += tierSize;
+
         // Mint tier
         _mintTier(msg.sender, tokenTier, tierSize);
-
-        // Distribute revenue
-        uint256 influencerReward = (discountedPrice * promoCode.commission) /
-            100;
-        _influencerBalances[promoCode.influencer] += influencerReward;
-        _promoCodes[promoCodeHash].totalRedeemed += tierSize;
-        _totalRevenue = _totalRevenue + (totalCost - influencerReward);
     }
 
     /**
@@ -802,12 +865,12 @@ contract ArchetypeAvatars is
         return _nftPayWhitelist[nftPay];
     }
 
-    function minted(
+    function phaseWhitelisted(
         address wallet,
-        uint256 phase,
-        uint256 tier
-    ) external view virtual returns (bool) {
-        return _minted[wallet][phase][tier];
+        uint256 tier,
+        uint256 phase
+    ) external view virtual returns (PhaseWhiteList memory) {
+        return _phaseWhitelist[wallet][tier][phase];
     }
 
     function tiers(
@@ -885,7 +948,7 @@ contract ArchetypeAvatars is
     ) external view returns (PromoCode memory) {
         require(
             _promoCodes[promoCodeHash].discount > 0,
-            "PROMO_CODE_DOES_NOT_EXIST"
+            "PROMO_DOES_NOT_EXIST"
         );
         PromoCode storage promoCode = _promoCodes[promoCodeHash];
         return promoCode;
