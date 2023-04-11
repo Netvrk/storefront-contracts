@@ -677,13 +677,11 @@ contract ArchetypeAvatars is
         uint256 totalCost = discountedPrice * tierSize;
 
         // Transfer tokens
-        require(
-            IERC20(_paymentToken).transferFrom(
-                msg.sender,
-                address(this),
-                totalCost
-            ),
-            "TOKEN_TRANSFER_FAIL"
+
+        IERC20(_paymentToken).transferFrom(
+            msg.sender,
+            address(this),
+            totalCost
         );
 
         // Mint tier
@@ -716,6 +714,7 @@ contract ArchetypeAvatars is
         require(tokenSize <= tier.maxPerTx, "MAX_PER_TX_EXCEEDED");
 
         // Check if max per wallet is not exceeded
+        // TODO: Check if this is correct
         if (!_nftPayWhitelist[to]) {
             require(
                 _ownerTierBalance[to][tierId] + tokenSize <= tier.maxPerWallet,
@@ -881,35 +880,15 @@ contract ArchetypeAvatars is
         return _ownerTierBalance[owner][tierId];
     }
 
-    function promoCodes(
+    function promoCodeInfo(
         bytes32 promoCodeHash
-    )
-        external
-        view
-        returns (
-            uint256 tier,
-            address influencer,
-            uint256 discount,
-            uint256 commission,
-            uint256 maxRedeemable,
-            uint256 totalRedeemed,
-            bool active
-        )
-    {
+    ) external view returns (PromoCode memory) {
         require(
             _promoCodes[promoCodeHash].discount > 0,
             "PROMO_CODE_DOES_NOT_EXIST"
         );
         PromoCode storage promoCode = _promoCodes[promoCodeHash];
-        return (
-            promoCode.tier,
-            promoCode.influencer,
-            promoCode.discount,
-            promoCode.commission,
-            promoCode.maxRedeemable,
-            promoCode.totalRedeemed,
-            promoCode.active
-        );
+        return promoCode;
     }
 
     /**
