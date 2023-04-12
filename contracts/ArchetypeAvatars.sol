@@ -53,9 +53,9 @@ contract ArchetypeAvatars is
         bytes32 merkleRoot;
     }
 
-    struct AirdropClaimed {
+    struct AirdropCompleted {
         uint256 id;
-        bool claimed;
+        bool completed;
     }
 
     struct PreSale {
@@ -74,8 +74,8 @@ contract ArchetypeAvatars is
     mapping(uint256 => Tier) private _tiers;
     mapping(uint256 => PreSale) private _presales;
     mapping(uint256 => Airdrop) private _airdrops;
-    mapping(address => mapping(uint256 => AirdropClaimed))
-        public _airdropClaims;
+    mapping(address => mapping(uint256 => AirdropCompleted))
+        public _airdropCompleted;
     mapping(uint256 => Sale) private _sales;
 
     uint256 public airdropIndex;
@@ -195,25 +195,6 @@ contract ArchetypeAvatars is
         _tiers[id].maxPerWallet = maxPerWallet;
     }
 
-    // Initialize sale
-    function startSale(
-        uint256 id,
-        uint256 saleStart,
-        uint256 saleEnd,
-        uint256 maxSupply
-    ) external virtual onlyRole(MANAGER_ROLE) {
-        require(id <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_sales[id].id == 0, "SALE_ALREADY_INITIALIZED");
-        require(saleStart < saleEnd, "INVALID_SALE_TIME");
-        require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
-
-        // Stop presale
-        _presales[id].presaleEnd = block.timestamp;
-
-        _sales[id] = Sale(id, saleStart, saleEnd);
-        _tiers[id].maxSupply = maxSupply;
-    }
-
     // Update sale
     function updateSale(
         uint256 id,
@@ -229,26 +210,6 @@ contract ArchetypeAvatars is
         _sales[id].saleStart = saleStart;
         _sales[id].saleEnd = saleEnd;
 
-        _tiers[id].maxSupply = maxSupply;
-    }
-
-    // Initialize presale
-    function startPresale(
-        uint256 id,
-        uint256 presaleStart,
-        uint256 presaleEnd,
-        bytes32 merkleRoot_,
-        uint256 maxSupply
-    ) external virtual onlyRole(MANAGER_ROLE) {
-        require(id <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_presales[id].id == 0, "PRESALE_ALREADY_INITIALIZED");
-        require(presaleStart < presaleEnd, "INVALID_PRESALE_TIME");
-        require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
-
-        // Stop sale
-        _sales[id].saleEnd = block.timestamp;
-
-        _presales[id] = PreSale(id, presaleStart, presaleEnd, merkleRoot_);
         _tiers[id].maxSupply = maxSupply;
     }
 
@@ -379,10 +340,10 @@ contract ArchetypeAvatars is
     }
 
     /*
-     *********************
-     # PHASE 1: AIRDROP
-     *********************
-     */
+    *********************
+    # AIRDROP
+    *********************
+    */
 
     function createAirdrop(
         bytes32 merkleRoot
@@ -409,8 +370,8 @@ contract ArchetypeAvatars is
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             require(
-                !_airdropClaims[recipients[idx]][airdropIndex].claimed,
-                "ALREADY_CLAIMED"
+                !_airdropCompleted[recipients[idx]][airdropIndex].completed,
+                "ALREADY_COMPLETED"
             );
             require(
                 MerkleProofUpgradeable.verify(
@@ -427,7 +388,7 @@ contract ArchetypeAvatars is
                 "USER_NOT_WHITELISTED"
             );
             _mintTier(recipients[idx], tokenTiers[idx], tierSizes[idx]);
-            _airdropClaims[recipients[idx]][airdropIndex] = AirdropClaimed(
+            _airdropCompleted[recipients[idx]][airdropIndex] = AirdropCompleted(
                 airdropIndex,
                 true
             );
@@ -443,6 +404,7 @@ contract ArchetypeAvatars is
     /* #################################################
     ####################################################
     ################## PHASE 1 #########################
+    ###### FREE CLAIMS - NETVRK NFT STAKERS ############
     ####################################################
     */
     function initPhase1(
@@ -462,7 +424,7 @@ contract ArchetypeAvatars is
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             _phaseWhitelist[recipients[idx]][tokenTier][1] = PhaseWhiteList(
                 freeClaims[idx],
-                0,
+                100,
                 0
             );
         }
@@ -492,6 +454,7 @@ contract ArchetypeAvatars is
     /*##################################################
     ####################################################
     ################## PHASE 2 #########################
+    ######## WHITELIST - NETVRK NFT STAKERS ############
     ####################################################
     */
 
@@ -524,7 +487,7 @@ contract ArchetypeAvatars is
         _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
     }
 
-    // Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, price)
+    // Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, discount)
     function mintPhase2(
         uint256 tokenTier,
         uint256 tierSize
@@ -571,6 +534,7 @@ contract ArchetypeAvatars is
     /* #################################################
     ####################################################
     ################## PHASE 3 #########################
+    ######### WHITELIST - PARTNER PROJECTS #############
     ####################################################
     */
 
@@ -673,6 +637,7 @@ contract ArchetypeAvatars is
     /* #################################################
     ####################################################
     ################## PHASE 4 #########################
+    ################ PUBLIC SALE #######################
     ####################################################
     */
 
