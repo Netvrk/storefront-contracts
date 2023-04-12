@@ -607,12 +607,12 @@ contract ArchetypeAvatars is
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
         require(
-            _phaseWhitelist[msg.sender][tokenTier][2].maxMint > 0,
+            _phaseWhitelist[msg.sender][tokenTier][3].maxMint > 0,
             "USER_NOT_WHITELISTED"
         );
         require(
-            _phaseWhitelist[msg.sender][tokenTier][2].minted + tierSize <=
-                _phaseWhitelist[msg.sender][tokenTier][2].maxMint,
+            _phaseWhitelist[msg.sender][tokenTier][3].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tokenTier][3].maxMint,
             "MAX_MINT_EXCEEDED"
         );
 
@@ -750,9 +750,6 @@ contract ArchetypeAvatars is
             address(this),
             totalCost
         );
-
-        // Update Mint
-        _phaseWhitelist[msg.sender][tokenTier][3].minted += tierSize;
 
         // Mint tier
         _mintTier(msg.sender, tokenTier, tierSize);
