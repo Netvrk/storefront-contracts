@@ -47,42 +47,33 @@ contract ArchetypeAvatars is
         uint256 maxPerTx;
         uint256 maxPerWallet;
     }
+    mapping(uint256 => Tier) private _tiers;
 
     struct Airdrop {
         uint256 id;
         bytes32 merkleRoot;
     }
-
     struct AirdropCompleted {
         uint256 id;
         bool completed;
     }
-
-    struct PreSale {
-        uint256 id;
-        uint256 presaleStart;
-        uint256 presaleEnd;
-        bytes32 merkleRoot;
-    }
+    mapping(uint256 => Airdrop) private _airdrops;
+    mapping(address => mapping(uint256 => AirdropCompleted))
+        public _airdropCompleted;
+    uint256 public airdropIndex;
 
     struct Sale {
         uint256 id;
         uint256 saleStart;
         uint256 saleEnd;
     }
-
-    mapping(uint256 => Tier) private _tiers;
-    mapping(uint256 => PreSale) private _presales;
-    mapping(uint256 => Airdrop) private _airdrops;
-    mapping(address => mapping(uint256 => AirdropCompleted))
-        public _airdropCompleted;
-    mapping(uint256 => Sale) private _sales;
-
-    uint256 public airdropIndex;
+    // Tier => Phase => Sale
+    mapping(uint256 => mapping(uint256 => Sale)) private _sales;
 
     mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
     mapping(address => mapping(uint256 => mapping(uint256 => uint256)))
         private _ownerTierTokens;
+
     uint256 private _totalRevenue;
     uint256 private constant _maxTiers = 100;
     uint256 private _totalTiers;
@@ -197,53 +188,30 @@ contract ArchetypeAvatars is
 
     // Update sale
     function updateSale(
-        uint256 id,
+        uint256 tierId,
+        uint256 phase,
         uint256 saleStart,
         uint256 saleEnd,
         uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
-        require(id <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_sales[id].id != 0, "SALE_NOT_INITIALIZED");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_sales[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
         require(saleStart < saleEnd, "INVALID_SALE_TIME");
-        require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
+        require(maxSupply > _tiers[tierId].supply, "INVALID_SUPPLY");
 
-        _sales[id].saleStart = saleStart;
-        _sales[id].saleEnd = saleEnd;
+        _sales[tierId][phase].saleStart = saleStart;
+        _sales[tierId][phase].saleEnd = saleEnd;
 
-        _tiers[id].maxSupply = maxSupply;
+        _tiers[tierId].maxSupply = maxSupply;
     }
 
-    // Update presale
-    function updatePresale(
-        uint256 id,
-        uint256 presaleStart,
-        uint256 presaleEnd,
-        bytes32 merkleRoot_,
-        uint256 maxSupply
-    ) external virtual onlyRole(MANAGER_ROLE) {
-        require(id <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_presales[id].id != 0, "PRESALE_NOT_INITIALIZED");
-        require(presaleStart < presaleEnd, "INVALID_PRESALE_TIME");
-        require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
-
-        _presales[id].presaleStart = presaleStart;
-        _presales[id].presaleEnd = presaleEnd;
-        _presales[id].merkleRoot = merkleRoot_;
-        _tiers[id].maxSupply = maxSupply;
-    }
-
-    function stopPresale(
-        uint256 tierId
+    function stopSale(
+        uint256 tierId,
+        uint256 phase
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_presales[tierId].id != 0, "PRESALE_NOT_INITIALIZED");
-        _presales[tierId].presaleEnd = block.timestamp;
-    }
-
-    function stopSale(uint256 tierId) external virtual onlyRole(MANAGER_ROLE) {
-        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_sales[tierId].id != 0, "SALE_NOT_INITIALIZED");
-        _sales[tierId].saleEnd = block.timestamp;
+        require(_sales[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
+        _sales[tierId][phase].saleEnd = block.timestamp;
     }
 
     // Withdraw all revenues
@@ -288,15 +256,13 @@ contract ArchetypeAvatars is
         uint256 commission,
         uint256 maxRedeemable
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount > 0, "DISCOUNT_MUST_BE_GREATER_THAN_0");
-        require(discount < 100, "DISCOUNT_MUST_BE_LESS_THAN_100");
-        require(commission > 0, "COMMISION_MUST_BE_GREATER_THAN_0");
-        require(commission < 100, "COMMISSION_MUST_BE_LESS_THAN_100");
-        require(maxRedeemable > 0, "MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0");
+        require(discount > 0 && discount < 100, "INVALID_DISCOUNT");
+        require(commission > 0 && commission < 100, "INVALID_COMMISION");
+        require(maxRedeemable > 0, "INVALID_MAX_REDEEMEABLE");
         require(
             _promoCodes[promoCodeHash].discount == 0,
             "PROMO_ALREADY_EXISTS"
-        ); // TODO: better way to check if exists?
+        );
 
         _promoCodes[promoCodeHash] = PromoCode(
             tier,
@@ -318,15 +284,13 @@ contract ArchetypeAvatars is
         uint256 maxRedeemable,
         bool active
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount > 0, "DISCOUNT_MUST_BE_GREATER_THAN_0");
-        require(discount < 100, "DISCOUNT_MUST_BE_LESS_THAN_100");
-        require(commission > 0, "COMMISION_MUST_BE_GREATER_THAN_0");
-        require(commission < 100, "COMMISSION_MUST_BE_LESS_THAN_100");
-        require(maxRedeemable > 0, "MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0");
+        require(discount > 0 && discount < 100, "INVALID_DISCOUNT");
+        require(commission > 0 && commission < 100, "INVALID_COMMISION");
+        require(maxRedeemable > 0, "INVALID_MAX_REDEEMEABLE");
         require(
             _promoCodes[promoCodeHash].discount == 0,
             "PROMO_ALREADY_EXISTS"
-        ); // TODO: better way to check if exists?
+        );
 
         _promoCodes[promoCodeHash] = PromoCode(
             tier,
@@ -334,15 +298,15 @@ contract ArchetypeAvatars is
             discount,
             commission,
             maxRedeemable,
-            _promoCodes[promoCodeHash].totalRedeemed, // TODO: better way to do this?
+            _promoCodes[promoCodeHash].totalRedeemed,
             active
         );
     }
 
-    /*
-    *********************
-    # AIRDROP
-    *********************
+    /*##################################################
+    ################## PHASE 0 #########################
+    ############ AIRDROP TO PARTNERS ###################
+    ####################################################
     */
 
     function createAirdrop(
@@ -360,8 +324,11 @@ contract ArchetypeAvatars is
         bytes32[][] memory merkleProofs
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
         // Check lengths
-        require(recipients.length == tokenTiers.length, "INVALID_TIER_SIZE");
-        require(recipients.length == tierSizes.length, "INVALID_TIER_SIZE");
+        require(
+            recipients.length == tokenTiers.length,
+            "INVALID_INPUT_LENGTHS"
+        );
+        require(recipients.length == tierSizes.length, "INVALID_INPUT_LENGTHS");
         require(
             recipients.length == merkleProofs.length,
             "INVALID_INPUT_LENGTHS"
@@ -395,14 +362,7 @@ contract ArchetypeAvatars is
         }
     }
 
-    /**
-    ////////////////////////////////////////////////////
-    // Public Functions 
-    ///////////////////////////////////////////////////
-    */
-
-    /* #################################################
-    ####################################################
+    /*##################################################
     ################## PHASE 1 #########################
     ###### FREE CLAIMS - NETVRK NFT STAKERS ############
     ####################################################
@@ -416,7 +376,7 @@ contract ArchetypeAvatars is
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
         require(
             recipients.length == freeClaims.length,
-            "INVALID_RECIPIENTS_SIZE"
+            "INVALID_INPUT_LENGTHS"
         );
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_PRESALE_TIME");
@@ -428,7 +388,7 @@ contract ArchetypeAvatars is
                 0
             );
         }
-        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
+        _sales[tokenTier][1] = Sale(tokenTier, startTime, endTime);
     }
 
     // Phase 1: Free claim for whitelisted addresses (address, max qty)
@@ -437,7 +397,7 @@ contract ArchetypeAvatars is
         uint256 tierSize
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
+        require(_isSaleActive(tokenTier, 1), "SALE_NOT_ACTIVE");
         require(
             _phaseWhitelist[msg.sender][tokenTier][1].maxMint > 0,
             "USER_NOT_WHITELISTED"
@@ -452,7 +412,6 @@ contract ArchetypeAvatars is
     }
 
     /*##################################################
-    ####################################################
     ################## PHASE 2 #########################
     ######## WHITELIST - NETVRK NFT STAKERS ############
     ####################################################
@@ -468,12 +427,9 @@ contract ArchetypeAvatars is
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
         require(
             recipients.length == freeClaims.length,
-            "INVALID_RECIPIENTS_SIZE"
+            "INVALID_INPUT_LENGTHS"
         );
-        require(
-            recipients.length == discounts.length,
-            "INVALID_RECIPIENTS_SIZE"
-        );
+        require(recipients.length == discounts.length, "INVALID_INPUT_LENGTHS");
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_PRESALE_TIME");
 
@@ -484,7 +440,7 @@ contract ArchetypeAvatars is
                 0
             );
         }
-        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
+        _sales[tokenTier][2] = Sale(tokenTier, startTime, endTime);
     }
 
     // Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, discount)
@@ -493,7 +449,7 @@ contract ArchetypeAvatars is
         uint256 tierSize
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
+        require(_isSaleActive(tokenTier, 2), "SALE_NOT_ACTIVE");
         require(
             _phaseWhitelist[msg.sender][tokenTier][2].maxMint > 0,
             "USER_NOT_WHITELISTED"
@@ -531,8 +487,7 @@ contract ArchetypeAvatars is
         _mintTier(msg.sender, tokenTier, tierSize);
     }
 
-    /* #################################################
-    ####################################################
+    /*##################################################
     ################## PHASE 3 #########################
     ######### WHITELIST - PARTNER PROJECTS #############
     ####################################################
@@ -558,7 +513,7 @@ contract ArchetypeAvatars is
                 0
             );
         }
-        _presales[tokenTier] = PreSale(tokenTier, startTime, endTime, "");
+        _sales[tokenTier][3] = Sale(tokenTier, startTime, endTime);
         _tiers[tokenTier].maxPerTx = maxPerTx;
         _tiers[tokenTier].maxPerWallet = maxPerWallet;
     }
@@ -569,7 +524,7 @@ contract ArchetypeAvatars is
         bytes32 promoCodeHash
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isPresaleActive(tokenTier), "PRESALE_NOT_ACTIVE");
+        require(_isSaleActive(tokenTier, 3), "SALE_NOT_ACTIVE");
         require(
             _phaseWhitelist[msg.sender][tokenTier][3].maxMint > 0,
             "USER_NOT_WHITELISTED"
@@ -634,8 +589,7 @@ contract ArchetypeAvatars is
         _mintTier(msg.sender, tokenTier, tierSize);
     }
 
-    /* #################################################
-    ####################################################
+    /*##################################################
     ################## PHASE 4 #########################
     ################ PUBLIC SALE #######################
     ####################################################
@@ -655,7 +609,7 @@ contract ArchetypeAvatars is
         require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
         require(maxPerTx > 0, "INVALID_MAX_PER_TX");
 
-        _sales[tokenTier] = Sale(tokenTier, startTime, endTime);
+        _sales[tokenTier][4] = Sale(tokenTier, startTime, endTime);
         _tiers[tokenTier].maxPerTx = maxPerTx;
         _tiers[tokenTier].maxPerWallet = maxPerWallet;
         _tiers[tokenTier].maxSupply = maxSupply;
@@ -667,7 +621,7 @@ contract ArchetypeAvatars is
         bytes32 promoCodeHash
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier), "SALE_NOT_ACTIVE");
+        require(_isSaleActive(tokenTier, 4), "SALE_NOT_ACTIVE");
 
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
@@ -759,16 +713,13 @@ contract ArchetypeAvatars is
         }
     }
 
-    function _isSaleActive(uint256 tierId) internal view returns (bool) {
+    function _isSaleActive(
+        uint256 tierId,
+        uint256 phase
+    ) internal view returns (bool) {
         return
-            block.timestamp >= _sales[tierId].saleStart &&
-            block.timestamp <= _sales[tierId].saleEnd;
-    }
-
-    function _isPresaleActive(uint256 tierId) internal view returns (bool) {
-        return
-            block.timestamp >= _presales[tierId].presaleStart &&
-            block.timestamp <= _presales[tierId].presaleEnd;
+            block.timestamp >= _sales[tierId][phase].saleStart &&
+            block.timestamp <= _sales[tierId][phase].saleEnd;
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
@@ -801,14 +752,11 @@ contract ArchetypeAvatars is
         return _totalTiers;
     }
 
-    function isSaleActive(uint256 tierId) external view virtual returns (bool) {
-        return _isSaleActive(tierId);
-    }
-
-    function isPresaleActive(
-        uint256 tierId
+    function isSaleActive(
+        uint256 tierId,
+        uint256 phase
     ) external view virtual returns (bool) {
-        return _isPresaleActive(tierId);
+        return _isSaleActive(tierId, phase);
     }
 
     function paymentToken() external view virtual returns (address) {
@@ -860,23 +808,12 @@ contract ArchetypeAvatars is
     }
 
     function sales(
-        uint256 tierId
+        uint256 tierId,
+        uint256 phase
     ) external view returns (uint256 saleStart, uint256 saleEnd) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        Sale storage sale = _sales[tierId];
+        Sale storage sale = _sales[tierId][phase];
         return (sale.saleStart, sale.saleEnd);
-    }
-
-    function presales(
-        uint256 tierId
-    )
-        external
-        view
-        returns (uint256 presaleStart, uint256 presaleEnd, bytes32 merkleRoot)
-    {
-        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        PreSale storage presale = _presales[tierId];
-        return (presale.presaleStart, presale.presaleEnd, presale.merkleRoot);
     }
 
     function tierTokenByIndex(
