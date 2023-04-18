@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
-import "hardhat/console.sol";
+
+// import "hardhat/console.sol";
 
 /*
 PHASES:
@@ -27,11 +29,12 @@ Events
 
 contract ArchetypeAvatars is
     ERC2981,
-    AccessControl,
-    ReentrancyGuard,
-    ERC721Enumerable
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    ERC721EnumerableUpgradeable,
+    UUPSUpgradeable
 {
-    using MerkleProof for bytes32[];
+    using MerkleProofUpgradeable for bytes32[];
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     address private _treasury;
@@ -70,6 +73,7 @@ contract ArchetypeAvatars is
     // Tier => Phase => Sale
     mapping(uint256 => mapping(uint256 => Sale)) private _sales;
 
+    mapping(address => bool) private _nftPayWhitelist;
     mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
     mapping(address => mapping(uint256 => mapping(uint256 => uint256)))
         private _ownerTierTokens;
@@ -90,8 +94,6 @@ contract ArchetypeAvatars is
     mapping(bytes32 => PromoCode) private _promoCodes;
     mapping(address => uint256) public _influencerBalances;
 
-    mapping(address => bool) private _nftPayWhitelist;
-
     struct PhaseWhiteList {
         uint256 maxMint;
         uint256 discount;
@@ -101,23 +103,29 @@ contract ArchetypeAvatars is
     mapping(address => mapping(uint256 => mapping(uint256 => PhaseWhiteList)))
         private _phaseWhitelist;
 
-    constructor(
+    function initialize(
         string memory name_,
         string memory symbol_,
         string memory baseURI_,
         address treasury_,
-        address manager,
+        address manager_,
         address paymentToken_
-    ) ERC721(name_, symbol_) {
+    ) public initializer {
+        __ERC721_init(name_, symbol_);
+        __ERC721Enumerable_init();
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init_unchained();
+        __AccessControl_init_unchained();
+
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MANAGER_ROLE, manager);
+        _setupRole(MANAGER_ROLE, manager_);
 
         _tokenBaseURI = baseURI_;
         _treasury = treasury_;
-        _totalTiers = 0;
         _paymentToken = paymentToken_;
 
         airdropIndex = 0;
+        _totalTiers = 0;
     }
 
     // Set NFT base URI
@@ -218,14 +226,7 @@ contract ArchetypeAvatars is
     function withdraw() external virtual nonReentrant {
         require(address(this).balance > 0, "ZERO_BALANCE");
         uint256 balance = IERC20(_paymentToken).balanceOf(address(this));
-        require(
-            IERC20(_paymentToken).transferFrom(
-                address(this),
-                _treasury,
-                balance
-            ),
-            "TOKEN_TRANSFER_FAIL"
-        );
+        IERC20(_paymentToken).transferFrom(address(this), _treasury, balance);
     }
 
     // Withdraw influencer rewards
@@ -236,16 +237,11 @@ contract ArchetypeAvatars is
         IERC20(_paymentToken).transfer(msg.sender, reward);
     }
 
-    function addToNftPayWhitelist(
-        address whitelistAddress
+    function updateNftPayWhitelist(
+        address whitelistAddress,
+        bool enable
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        _nftPayWhitelist[whitelistAddress] = true;
-    }
-
-    function removeFromNftPayWhitelist(
-        address whitelistAddress
-    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        _nftPayWhitelist[whitelistAddress] = false;
+        _nftPayWhitelist[whitelistAddress] = enable;
     }
 
     function addPromoCode(
@@ -866,7 +862,7 @@ contract ArchetypeAvatars is
         public
         view
         virtual
-        override(ERC2981, ERC721Enumerable, AccessControl)
+        override(ERC2981, ERC721EnumerableUpgradeable, AccessControlUpgradeable)
         returns (bool)
     {
         if (interfaceId == type(IERC2981).interfaceId) {
@@ -874,4 +870,9 @@ contract ArchetypeAvatars is
         }
         return super.supportsInterface(interfaceId);
     }
+
+    // UUPS proxy function
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

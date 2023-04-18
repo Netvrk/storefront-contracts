@@ -12,18 +12,18 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1000,
       },
     },
   },
   networks: {
-    // goerli: {
-    //   url: process.env.GOERLI_URL || "",
-    //   accounts:
-    //     process.env.PRIVATE_KEY_1 !== undefined
-    //       ? [process.env.PRIVATE_KEY_1]
-    //       : [],
-    // },
+    goerli: {
+      url: process.env.GOERLI_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY_1 !== undefined
+          ? [process.env.PRIVATE_KEY_1]
+          : [],
+    },
     mumbai: {
       url: process.env.MUMBAI_URL || "",
       accounts:
