@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
+
 import "hardhat/console.sol";
 
 /*
@@ -20,9 +20,9 @@ Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, ma
 Phase 3: Pre-sale for whitelisted address w/ promo code option (address)
 Phase 4: Public sale w/ promo code option
 
-TODO:
-Events
--emit influencer reward after promo code mint (to be used for an influencer leaderboard)
+TODO: Events -emit influencer reward after promo code mint (to be used for an influencer leaderboard)
+TODO: Add minter role for airdrop by external contract
+TODO: Max per wallet: for each phase or same for all?
 */
 
 contract ArchetypeAvatars is
@@ -49,19 +49,6 @@ contract ArchetypeAvatars is
     }
     mapping(uint256 => Tier) private _tiers;
 
-    struct Airdrop {
-        uint256 id;
-        bytes32 merkleRoot;
-    }
-    struct AirdropCompleted {
-        uint256 id;
-        bool completed;
-    }
-    mapping(uint256 => Airdrop) private _airdrops;
-    mapping(address => mapping(uint256 => AirdropCompleted))
-        public _airdropCompleted;
-    uint256 public airdropIndex;
-
     struct Sale {
         uint256 id;
         uint256 saleStart;
@@ -87,7 +74,7 @@ contract ArchetypeAvatars is
         uint256 totalRedeemed;
         bool active;
     }
-    mapping(bytes32 => PromoCode) private _promoCodes;
+    mapping(string => PromoCode) private _promoCodes;
     mapping(address => uint256) public _influencerBalances;
 
     mapping(address => bool) private _nftPayWhitelist;
@@ -116,8 +103,6 @@ contract ArchetypeAvatars is
         _treasury = treasury_;
         _totalTiers = 0;
         _paymentToken = paymentToken_;
-
-        airdropIndex = 0;
     }
 
     // Set NFT base URI
@@ -216,16 +201,9 @@ contract ArchetypeAvatars is
 
     // Withdraw all revenues
     function withdraw() external virtual nonReentrant {
-        require(address(this).balance > 0, "ZERO_BALANCE");
         uint256 balance = IERC20(_paymentToken).balanceOf(address(this));
-        require(
-            IERC20(_paymentToken).transferFrom(
-                address(this),
-                _treasury,
-                balance
-            ),
-            "TOKEN_TRANSFER_FAIL"
-        );
+        require(balance > 0, "ZERO_BALANCE");
+        IERC20(_paymentToken).transfer(_treasury, balance);
     }
 
     // Withdraw influencer rewards
@@ -236,130 +214,34 @@ contract ArchetypeAvatars is
         IERC20(_paymentToken).transfer(msg.sender, reward);
     }
 
-    function addToNftPayWhitelist(
-        address whitelistAddress
+    function updateToNftPayWhitelist(
+        address whitelistAddress,
+        bool enable
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        _nftPayWhitelist[whitelistAddress] = true;
-    }
-
-    function removeFromNftPayWhitelist(
-        address whitelistAddress
-    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        _nftPayWhitelist[whitelistAddress] = false;
-    }
-
-    function addPromoCode(
-        uint256 tier,
-        bytes32 promoCodeHash,
-        address infuencer,
-        uint256 discount,
-        uint256 commission,
-        uint256 maxRedeemable
-    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount > 0 && discount < 100, "INVALID_DISCOUNT");
-        require(commission > 0 && commission < 100, "INVALID_COMMISION");
-        require(maxRedeemable > 0, "INVALID_MAX_REDEEMEABLE");
-        require(
-            _promoCodes[promoCodeHash].discount == 0,
-            "PROMO_ALREADY_EXISTS"
-        );
-
-        _promoCodes[promoCodeHash] = PromoCode(
-            tier,
-            infuencer,
-            discount,
-            commission,
-            maxRedeemable,
-            0,
-            true
-        );
+        _nftPayWhitelist[whitelistAddress] = enable;
     }
 
     function updatePromoCode(
         uint256 tier,
-        bytes32 promoCodeHash,
+        string memory promo,
         address infuencer,
         uint256 discount,
         uint256 commission,
         uint256 maxRedeemable,
         bool active
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount > 0 && discount < 100, "INVALID_DISCOUNT");
-        require(commission > 0 && commission < 100, "INVALID_COMMISION");
-        require(maxRedeemable > 0, "INVALID_MAX_REDEEMEABLE");
-        require(
-            _promoCodes[promoCodeHash].discount == 0,
-            "PROMO_ALREADY_EXISTS"
-        );
+        require(discount < 100, "INVALID_DISCOUNT");
+        require(commission < 100, "INVALID_COMMISION");
 
-        _promoCodes[promoCodeHash] = PromoCode(
+        _promoCodes[promo] = PromoCode(
             tier,
             infuencer,
             discount,
             commission,
             maxRedeemable,
-            _promoCodes[promoCodeHash].totalRedeemed,
+            _promoCodes[promo].totalRedeemed,
             active
         );
-    }
-
-    /*##################################################
-    ################## PHASE 0 #########################
-    ############ AIRDROP TO PARTNERS ###################
-    ####################################################
-    */
-
-    function createAirdrop(
-        bytes32 merkleRoot
-    ) external virtual onlyRole(MANAGER_ROLE) {
-        require(merkleRoot != bytes32(0), "INVALID_MERKLE_ROOT");
-        airdropIndex++;
-        _airdrops[airdropIndex] = Airdrop(airdropIndex, merkleRoot);
-    }
-
-    function startAirdrop(
-        address[] memory recipients,
-        uint256[] memory tokenTiers,
-        uint256[] memory tierSizes,
-        bytes32[][] memory merkleProofs
-    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        // Check lengths
-        require(
-            recipients.length == tokenTiers.length,
-            "INVALID_INPUT_LENGTHS"
-        );
-        require(recipients.length == tierSizes.length, "INVALID_INPUT_LENGTHS");
-        require(
-            recipients.length == merkleProofs.length,
-            "INVALID_INPUT_LENGTHS"
-        );
-        require(airdropIndex > 0, "AIRDROP_NOT_CREATED");
-
-        for (uint256 idx = 0; idx < recipients.length; idx++) {
-            require(
-                !_airdropCompleted[recipients[idx]][airdropIndex].completed,
-                "ALREADY_COMPLETED"
-            );
-            require(
-                MerkleProofUpgradeable.verify(
-                    merkleProofs[idx],
-                    _airdrops[airdropIndex].merkleRoot,
-                    keccak256(
-                        abi.encodePacked(
-                            recipients[idx],
-                            tokenTiers[idx],
-                            tierSizes[idx]
-                        )
-                    )
-                ),
-                "USER_NOT_WHITELISTED"
-            );
-            _mintTier(recipients[idx], tokenTiers[idx], tierSizes[idx]);
-            _airdropCompleted[recipients[idx]][airdropIndex] = AirdropCompleted(
-                airdropIndex,
-                true
-            );
-        }
     }
 
     /*##################################################
@@ -463,7 +345,7 @@ contract ArchetypeAvatars is
         // Calculate total cost
         uint256 discount = _phaseWhitelist[msg.sender][tokenTier][2].discount;
         Tier storage tier = _tiers[tokenTier];
-        uint256 discountedPrice = tier.price * ((100 - discount) / 100);
+        uint256 discountedPrice = (tier.price * (100 - discount)) / 100;
         uint256 totalCost = discountedPrice * tierSize;
 
         // Check if fund is sufficient
@@ -521,7 +403,7 @@ contract ArchetypeAvatars is
     function mintPhase3(
         uint256 tokenTier,
         uint256 tierSize,
-        bytes32 promoCodeHash
+        string memory promo
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isSaleActive(tokenTier, 3), "SALE_NOT_ACTIVE");
@@ -538,16 +420,16 @@ contract ArchetypeAvatars is
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
         uint256 totalCost = 0;
-        if (promoCodeHash.length > 0) {
-            PromoCode memory promoCode = _promoCodes[promoCodeHash];
+        if (bytes(promo).length > 0) {
+            PromoCode memory promoCode = _promoCodes[promo];
             require(promoCode.active == true, "PROMO_NOT_ACTIVE");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
                 "PROMO_MAX_REDEEMABLE_EXCEEDED"
             );
             require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
-            uint256 discountedPrice = tier.price *
-                ((100 - promoCode.discount) / 100);
+            uint256 discountedPrice = (tier.price *
+                (100 - promoCode.discount)) / 100;
             totalCost = discountedPrice * tierSize;
 
             // Check if fund is sufficient
@@ -560,12 +442,11 @@ contract ArchetypeAvatars is
             uint256 influencerReward = (discountedPrice *
                 promoCode.commission) / 100;
             _influencerBalances[promoCode.influencer] += influencerReward;
-            _promoCodes[promoCodeHash].totalRedeemed += tierSize;
+            _promoCodes[promo].totalRedeemed += tierSize;
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
         } else {
             // Update Revenue
             totalCost = tier.price * tierSize;
-
             // Check if fund is sufficient
             require(
                 IERC20(_paymentToken).balanceOf(msg.sender) >= totalCost,
@@ -574,7 +455,6 @@ contract ArchetypeAvatars is
             // Update Revenue
             _totalRevenue = _totalRevenue + totalCost;
         }
-
         // Transfer tokens
         IERC20(_paymentToken).transferFrom(
             msg.sender,
@@ -618,7 +498,7 @@ contract ArchetypeAvatars is
     function mintPhase4(
         uint256 tokenTier,
         uint256 tierSize,
-        bytes32 promoCodeHash
+        string memory promo
     ) external virtual nonReentrant {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(_isSaleActive(tokenTier, 4), "SALE_NOT_ACTIVE");
@@ -626,16 +506,16 @@ contract ArchetypeAvatars is
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
         uint256 totalCost = 0;
-        if (promoCodeHash.length > 0) {
-            PromoCode memory promoCode = _promoCodes[promoCodeHash];
+        if (bytes(promo).length > 0) {
+            PromoCode memory promoCode = _promoCodes[promo];
             require(promoCode.active == true, "PROMO_NOT_ACTIVE");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
                 "PROMO_MAX_REDEEMABLE_EXCEEDED"
             );
             require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
-            uint256 discountedPrice = tier.price *
-                ((100 - promoCode.discount) / 100);
+            uint256 discountedPrice = (tier.price *
+                (100 - promoCode.discount)) / 100;
             totalCost = discountedPrice * tierSize;
 
             // Check if fund is sufficient
@@ -648,7 +528,7 @@ contract ArchetypeAvatars is
             uint256 influencerReward = (discountedPrice *
                 promoCode.commission) / 100;
             _influencerBalances[promoCode.influencer] += influencerReward;
-            _promoCodes[promoCodeHash].totalRedeemed += tierSize;
+            _promoCodes[promo].totalRedeemed += tierSize;
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
         } else {
             // Update Revenue
@@ -843,13 +723,9 @@ contract ArchetypeAvatars is
     }
 
     function promoCodeInfo(
-        bytes32 promoCodeHash
+        string memory promo
     ) external view returns (PromoCode memory) {
-        require(
-            _promoCodes[promoCodeHash].discount > 0,
-            "PROMO_DOES_NOT_EXIST"
-        );
-        PromoCode storage promoCode = _promoCodes[promoCodeHash];
+        PromoCode storage promoCode = _promoCodes[promo];
         return promoCode;
     }
 

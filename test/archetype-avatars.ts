@@ -7,7 +7,7 @@ import MerkleTree from "merkletreejs";
 import { ArchetypeAvatars, NRGY } from "../typechain-types";
 
 describe("Archetype Avatars ", function () {
-  let aAvatars: ArchetypeAvatars;
+  let avatar: ArchetypeAvatars;
   let nrgy: NRGY;
   let owner: Signer;
   let user: Signer;
@@ -44,11 +44,15 @@ describe("Archetype Avatars ", function () {
     nrgy = await nrgyContract.deploy();
     await nrgy.deployed();
 
+    // Transfer tokens to users
+    await nrgy.transfer(userAddress, ethers.utils.parseEther("1000"));
+    await nrgy.transfer(user2Address, ethers.utils.parseEther("1000"));
+
     const aAvatarsContract = await ethers.getContractFactory(
       "ArchetypeAvatars"
     );
 
-    aAvatars = (await aAvatarsContract.deploy(
+    avatar = (await aAvatarsContract.deploy(
       "MNT",
       "MNT",
       "https://api.example.com/",
@@ -57,75 +61,207 @@ describe("Archetype Avatars ", function () {
       nrgy.address
     )) as ArchetypeAvatars;
 
-    await aAvatars.deployed();
+    await avatar.deployed();
+
+    // Approve avatar contract to spend NRGY
+    await nrgy.approve(avatar.address, ethers.utils.parseEther("1000"));
+    await nrgy
+      .connect(user)
+      .approve(avatar.address, ethers.utils.parseEther("1000"));
+    await nrgy
+      .connect(user2)
+      .approve(avatar.address, ethers.utils.parseEther("1000"));
   });
 
   it("Setup contract", async function () {
-    await expect(aAvatars.connect(user).setBaseURI("https://api.example.com/"))
-      .to.be.reverted;
+    await expect(avatar.connect(user).setBaseURI("https://api.example.com/")).to
+      .be.reverted;
     await expect(
-      aAvatars.connect(user).setContractURI("https://api.example.com/contract")
+      avatar.connect(user).setContractURI("https://api.example.com/contract")
     ).to.be.reverted;
-    await expect(aAvatars.connect(user).setDefaultRoyalty(ownerAddress, 1000))
-      .to.be.reverted;
-    await aAvatars.setBaseURI("https://api.example.com/");
-    await aAvatars.setContractURI("https://api.example.com/contract");
-    await aAvatars.setDefaultRoyalty(ownerAddress, 1000);
-    expect(await aAvatars.contractURI()).to.be.equal(
+    await expect(avatar.connect(user).setDefaultRoyalty(ownerAddress, 1000)).to
+      .be.reverted;
+    await avatar.setBaseURI("https://api.example.com/");
+    await avatar.setContractURI("https://api.example.com/contract");
+    await avatar.setDefaultRoyalty(ownerAddress, 1000);
+    expect(await avatar.contractURI()).to.be.equal(
       "https://api.example.com/contract"
     );
     const royaltyAmount = ethers.utils.formatEther(
-      (await aAvatars.royaltyInfo(1, ethers.utils.parseEther("1")))[1]
+      (await avatar.royaltyInfo(1, ethers.utils.parseEther("1")))[1]
     );
     expect(royaltyAmount, "0.1");
-    expect(await aAvatars.treasury()).to.be.equal(ownerAddress);
+    expect(await avatar.treasury()).to.be.equal(ownerAddress);
   });
 
   it("Initialize Tier", async function () {
     await expect(
-      aAvatars.connect(user).initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.connect(user).initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
     ).to.be.reverted;
 
-    await expect(aAvatars.tiers(6)).to.be.revertedWith("TIER_UNAVAILABLE");
+    await expect(avatar.tiers(6)).to.be.revertedWith("TIER_UNAVAILABLE");
 
     await expect(
-      aAvatars.initTier(101, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.initTier(101, ethers.utils.parseEther("1"), 20, 2, 5)
     ).to.be.revertedWith("TIER_UNAVAILABLE");
     await expect(
-      aAvatars.initTier(1, ethers.utils.parseEther("1"), 0, 2, 5)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 0, 2, 5)
     ).to.be.revertedWith("INVALID_SUPPLY");
 
     await expect(
-      aAvatars.initTier(1, ethers.utils.parseEther("1"), 20, 0, 5)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 0, 5)
     ).to.be.revertedWith("INVALID_MAX_PER_TX");
 
     await expect(
-      aAvatars.initTier(1, ethers.utils.parseEther("1"), 20, 2, 0)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 0)
     ).to.be.revertedWith("INVALID_MAX_PER_WALLET");
 
-    await aAvatars.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5);
+    await avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5);
 
-    await aAvatars.initTier(2, ethers.utils.parseEther("0"), 20, 2, 5);
+    await avatar.initTier(2, ethers.utils.parseEther("0"), 20, 2, 5);
 
-    await aAvatars.initTier(3, ethers.utils.parseEther("1"), 20, 2, 5);
+    await avatar.initTier(3, ethers.utils.parseEther("1"), 20, 2, 5);
 
-    await aAvatars.initTier(4, ethers.utils.parseEther("1"), 20, 2, 5);
+    await avatar.initTier(4, ethers.utils.parseEther("1"), 20, 2, 5);
 
     await expect(
-      aAvatars.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
     ).to.be.revertedWith("TIER_ALREADY_INITIALIZED");
 
-    expect((await aAvatars.totalTiers()).toNumber()).to.be.equal(4);
+    expect((await avatar.totalTiers()).toNumber()).to.be.equal(4);
 
-    const tier1 = await aAvatars.tiers(1);
+    const tier1 = await avatar.tiers(1);
     expect(tier1.price).to.be.equal(ethers.utils.parseEther("1"));
+  });
+
+  it("Phase 1", async function () {
+    const startTime = now;
+    const endTime = now + 1000;
+    await avatar.initPhase1(
+      1,
+      [ownerAddress, userAddress],
+      [1, 2],
+      startTime,
+      endTime
+    );
+    expect(await avatar.isSaleActive(1, 1)).to.be.true;
+
+    await avatar.mintPhase1(1, 1);
+    await avatar.connect(user).mintPhase1(1, 1);
+    await avatar.connect(user).mintPhase1(1, 1);
+    await expect(avatar.connect(user2).mintPhase1(1, 1)).to.be.revertedWith(
+      "USER_NOT_WHITELISTED"
+    );
+    await expect(avatar.connect(user).mintPhase1(1, 1)).to.be.revertedWith(
+      "MAX_MINT_EXCEEDED"
+    );
+    await expect(avatar.connect(user).mintPhase1(1, 1)).to.be.revertedWith(
+      "MAX_MINT_EXCEEDED"
+    );
+
+    now = await time.increase(2000);
+    await expect(avatar.connect(user).mintPhase1(1, 1)).to.be.revertedWith(
+      "SALE_NOT_ACTIVE"
+    );
+  });
+
+  it("Phase 2", async function () {
+    const startTime = now;
+    const endTime = now + 1000;
+
+    await avatar.initPhase2(
+      1,
+      [ownerAddress, userAddress],
+      [1, 3],
+      [30, 20],
+      startTime,
+      endTime
+    );
+
+    expect(await avatar.isSaleActive(1, 2)).to.be.true;
+
+    await avatar.mintPhase2(1, 1);
+    await avatar.connect(user).mintPhase2(1, 1);
+    await avatar.connect(user).mintPhase2(1, 2);
+    await expect(avatar.connect(user2).mintPhase2(1, 1)).to.be.revertedWith(
+      "USER_NOT_WHITELISTED"
+    );
+    await expect(avatar.connect(user).mintPhase2(1, 1)).to.be.revertedWith(
+      "MAX_MINT_EXCEEDED"
+    );
+    await expect(avatar.connect(user).mintPhase2(1, 1)).to.be.revertedWith(
+      "MAX_MINT_EXCEEDED"
+    );
+
+    now = await time.increase(2000);
+    await expect(avatar.connect(user).mintPhase2(1, 1)).to.be.revertedWith(
+      "SALE_NOT_ACTIVE"
+    );
+  });
+
+  it("Add Promo Code", async function () {
+    await avatar.updatePromoCode(1, "xyz", ownerAddress, 12, 10, 5, true);
+    expect((await avatar.promoCodeInfo("xyz")).active).to.be.true;
+  });
+
+  it("Phase 3", async function () {
+    const startTime = now;
+    const endTime = now + 1000;
+    await avatar.initPhase3(
+      1,
+      [ownerAddress, userAddress],
+      startTime,
+      endTime,
+      4,
+      2
+    );
+
+    await avatar.mintPhase3(1, 1, "xyz");
+    await expect(avatar.mintPhase3(1, 2, "abc")).to.be.revertedWith(
+      "PROMO_NOT_ACTIVE"
+    );
+    await expect(avatar.mintPhase3(1, 2, "xyz")).to.be.revertedWith(
+      "MAX_PER_WALLET_EXCEEDED"
+    );
+
+    await avatar.mintPhase3(1, 1, "");
+  });
+
+  it("Remove Promo Code", async function () {
+    await avatar.updatePromoCode(
+      0,
+      "xyz",
+      ethers.constants.AddressZero,
+      0,
+      0,
+      0,
+      false
+    );
+
+    await expect(avatar.mintPhase3(1, 2, "xyz")).to.be.revertedWith(
+      "PROMO_NOT_ACTIVE"
+    );
+
+    expect((await avatar.promoCodeInfo("xyz")).active).to.be.false;
+  });
+
+  it("Phase 4", async function () {
+    await avatar.updatePromoCode(1, "abc", ownerAddress, 12, 10, 5, true);
+
+    const startTime = now;
+    const endTime = now + 1000;
+    await avatar.initPhase4(1, startTime, endTime, 20, 7, 2);
+
+    await avatar.connect(user).mintPhase4(1, 1, "abc");
+
+    await avatar.connect(user).mintPhase4(1, 1, "");
   });
 
   it("Withdraw", async function () {
     const balance = await owner.getBalance();
-    await aAvatars.withdraw();
+    await avatar.withdraw();
     const balance2 = await owner.getBalance();
     expect(balance2.toString()).to.not.equal(balance.toString());
-    await expect(aAvatars.withdraw()).to.be.revertedWith("ZERO_BALANCE");
+    await expect(avatar.withdraw()).to.be.revertedWith("ZERO_BALANCE");
   });
 });

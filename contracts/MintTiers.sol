@@ -98,25 +98,22 @@ contract MintTiers is
     */
 
     constructor(
-      string memory name_,
-      string memory symbol_,
-      string memory baseURI_,
-      address treasury_,
-      address manager,
-      address tokenAddress_,
-      uint256 influencerCommission_
-    ) ERC721(
-      name_,
-      symbol_
-    ) {
-      _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-      _setupRole(MANAGER_ROLE, manager);
+        string memory name_,
+        string memory symbol_,
+        string memory baseURI_,
+        address treasury_,
+        address manager,
+        address tokenAddress_,
+        uint256 influencerCommission_
+    ) ERC721(name_, symbol_) {
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(MANAGER_ROLE, manager);
 
-      _tokenBaseURI = baseURI_;
-      _treasury = treasury_;
-      _totalTiers = 0;
-      _tokenAddress = tokenAddress_;
-      _influencerCommission = influencerCommission_;
+        _tokenBaseURI = baseURI_;
+        _treasury = treasury_;
+        _totalTiers = 0;
+        _tokenAddress = tokenAddress_;
+        _influencerCommission = influencerCommission_;
     }
 
     // Set NFT base URI
@@ -279,7 +276,14 @@ contract MintTiers is
     function withdraw() external virtual nonReentrant {
         require(address(this).balance > 0, "ZERO_BALANCE");
         uint256 balance = IERC20(_tokenAddress).balanceOf(address(this));
-        require(IERC20(_tokenAddress).transferFrom(address(this), _treasury, balance), "TOKEN_TRANSFER_FAIL");
+        require(
+            IERC20(_tokenAddress).transferFrom(
+                address(this),
+                _treasury,
+                balance
+            ),
+            "TOKEN_TRANSFER_FAIL"
+        );
     }
 
     /**
@@ -312,7 +316,14 @@ contract MintTiers is
         }
 
         // Transfer tokens
-        require(IERC20(_tokenAddress).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
+        require(
+            IERC20(_tokenAddress).transferFrom(
+                msg.sender,
+                address(this),
+                totalCost
+            ),
+            "TOKEN_TRANSFER_FAIL"
+        );
 
         // Mint tier
         for (uint256 i = 0; i < tokenTiers.length; i++) {
@@ -357,7 +368,14 @@ contract MintTiers is
         }
 
         // transfer tokens
-        require(IERC20(_tokenAddress).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
+        require(
+            IERC20(_tokenAddress).transferFrom(
+                msg.sender,
+                address(this),
+                totalCost
+            ),
+            "TOKEN_TRANSFER_FAIL"
+        );
 
         // Mint tier
         for (uint256 i = 0; i < tokenTiers.length; i++) {
@@ -381,39 +399,48 @@ contract MintTiers is
             _mintTier(recipients[i], tokenTiers[i], tierSizes[i]);
         }
     }
-    
+
     function nftPayMint(
         uint256 tokenTier,
         uint256 tierSize
     ) external virtual nonReentrant {
         // Check whitelist
         require(nftPayWhitelist[msg.sender], "SENDER_NOT_WHITELISTED");
-        
+
         // Check if tier is available
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        
+
         Tier storage tier = _tiers[tokenTier];
         // Check if sale is active
         require(_isSaleActive(tokenTier), "SALE_NOT_ACTIVE");
 
         uint256 totalCost = 0;
         totalCost += tier.price * tierSize;
-        
+
         // Transfer tokens
-        require(IERC20(_tokenAddress).transferFrom(msg.sender, address(this), totalCost), "TOKEN_TRANSFER_FAIL");
+        require(
+            IERC20(_tokenAddress).transferFrom(
+                msg.sender,
+                address(this),
+                totalCost
+            ),
+            "TOKEN_TRANSFER_FAIL"
+        );
 
         _mintTier(msg.sender, tokenTier, tierSize);
 
         _totalRevenue = _totalRevenue + totalCost;
     }
 
-    function addToNftPayWhitelist(address whitelistAddress) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
+    function addToNftPayWhitelist(
+        address whitelistAddress
+    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
         nftPayWhitelist[whitelistAddress] = true;
     }
 
     function withdrawInfluencerRewards() public nonReentrant {
         uint256 reward = _influencerBalances[msg.sender];
-        require(reward > 0, 'SENDER REWARD BALANCE IS 0');
+        require(reward > 0, "SENDER REWARD BALANCE IS 0");
         _influencerBalances[msg.sender] = 0;
         IERC20(_tokenAddress).transfer(msg.sender, reward);
     }
@@ -425,10 +452,13 @@ contract MintTiers is
         uint256 discount_,
         uint256 maxRedeemable_
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount_ > 0, 'DISCOUNT_MUST_BE_GREATER_THAN_0');
-        require(discount_ < 100, 'DISCOUNT_MUST_BE_LESS_THAN_100');
-        require(maxRedeemable_ > 0, 'MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0');
-        require(_promoCodes[promoCodeHash_].discount == 0, 'PROMO_CODE_ALREADY_EXISTS'); // TODO: better way to check if exists?
+        require(discount_ > 0, "DISCOUNT_MUST_BE_GREATER_THAN_0");
+        require(discount_ < 100, "DISCOUNT_MUST_BE_LESS_THAN_100");
+        require(maxRedeemable_ > 0, "MAX_REDEEMEABLE_MUST_BE_GREATER_THAN_0");
+        require(
+            _promoCodes[promoCodeHash_].discount == 0,
+            "PROMO_CODE_ALREADY_EXISTS"
+        ); // TODO: better way to check if exists?
         _promoCodes[promoCodeHash_] = PromoCode(
             tier_,
             infuencer_,
@@ -447,10 +477,16 @@ contract MintTiers is
         uint256 maxRedeemable_,
         bool active_
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        require(discount_ > 0, 'DISCOUNT MUST BE GREATER THAN 0');
-        require(discount_ < 100, 'DISCOUNT_MUST_BE_LESS_THAN_100');
-        require(maxRedeemable_ <= _promoCodes[promoCodeHash_].totalRedeemed, 'MAX_REDEEMEABLE_TOO_HIGH');
-        require(_promoCodes[promoCodeHash_].discount != 0, 'PROMO CODE DOES NOT EXIST'); // TODO: better way to check if exists?
+        require(discount_ > 0, "DISCOUNT MUST BE GREATER THAN 0");
+        require(discount_ < 100, "DISCOUNT_MUST_BE_LESS_THAN_100");
+        require(
+            maxRedeemable_ <= _promoCodes[promoCodeHash_].totalRedeemed,
+            "MAX_REDEEMEABLE_TOO_HIGH"
+        );
+        require(
+            _promoCodes[promoCodeHash_].discount != 0,
+            "PROMO CODE DOES NOT EXIST"
+        ); // TODO: better way to check if exists?
         _promoCodes[promoCodeHash_] = PromoCode(
             tier_,
             infuencer_,
@@ -467,10 +503,13 @@ contract MintTiers is
         bytes32 promoCodeHash_
     ) external virtual nonReentrant {
         PromoCode memory promoCode = _promoCodes[promoCodeHash_];
-        require(promoCode.discount > 0, 'PROMO_CODE_DOES_NOT_EXIST');
-        require(promoCode.active == true, 'PROMO_CODE_NOT_ACTIVE');
-        require(promoCode.totalRedeemed + tierSize_ <= promoCode.maxRedeemable, 'PROMO_CODE_MAX_REDEEMABLE_EXCEEDED');
-        require(promoCode.tier == tokenTier_, 'PROMO_CODE_DOES_NOT_MATCH_TIER');
+        require(promoCode.discount > 0, "PROMO_CODE_DOES_NOT_EXIST");
+        require(promoCode.active == true, "PROMO_CODE_NOT_ACTIVE");
+        require(
+            promoCode.totalRedeemed + tierSize_ <= promoCode.maxRedeemable,
+            "PROMO_CODE_MAX_REDEEMABLE_EXCEEDED"
+        );
+        require(promoCode.tier == tokenTier_, "PROMO_CODE_DOES_NOT_MATCH_TIER");
 
         // Check if tier is available
         require(tokenTier_ <= _totalTiers, "TIER_UNAVAILABLE");
@@ -478,13 +517,15 @@ contract MintTiers is
         // Check if sale is active
         require(_isSaleActive(tokenTier_), "SALE_NOT_ACTIVE");
 
-        uint256 discountedPrice = tier.price * ((100 - promoCode.discount) / 100);
+        uint256 discountedPrice = tier.price *
+            ((100 - promoCode.discount) / 100);
         uint256 totalCost = discountedPrice * tierSize_;
-        uint256 influencerReward = discountedPrice * _influencerCommission / 100;
+        uint256 influencerReward = (discountedPrice * _influencerCommission) /
+            100;
 
         _influencerBalances[promoCode.influencer] += influencerReward;
         _promoCodes[promoCodeHash_].totalRedeemed += tierSize_;
-        
+
         // Transfer tokens
         IERC20(_tokenAddress).transfer(address(this), totalCost);
 
@@ -500,10 +541,13 @@ contract MintTiers is
         bytes32[] calldata merkleProof_
     ) external virtual nonReentrant {
         PromoCode memory promoCode = _promoCodes[promoCodeHash_];
-        require(promoCode.discount > 0, 'PROMO_CODE_DOES_NOT_EXIST');
-        require(promoCode.active == true, 'PROMO_CODE_NOT_ACTIVE');
-        require(promoCode.totalRedeemed + tierSize_ <= promoCode.maxRedeemable, 'PROMO_CODE_MAX_REDEEMABLE_EXCEEDED');
-        require(promoCode.tier == tokenTier_, 'PROMO_CODE_DOES_NOT_MATCH_TIER');
+        require(promoCode.discount > 0, "PROMO_CODE_DOES_NOT_EXIST");
+        require(promoCode.active == true, "PROMO_CODE_NOT_ACTIVE");
+        require(
+            promoCode.totalRedeemed + tierSize_ <= promoCode.maxRedeemable,
+            "PROMO_CODE_MAX_REDEEMABLE_EXCEEDED"
+        );
+        require(promoCode.tier == tokenTier_, "PROMO_CODE_DOES_NOT_MATCH_TIER");
 
         // Check if tier is available
         require(tokenTier_ <= _totalTiers, "TIER_UNAVAILABLE");
@@ -520,13 +564,15 @@ contract MintTiers is
             "USER_NOT_WHITELISTED"
         );
 
-        uint256 discountedPrice = tier.price * ((100 - promoCode.discount) / 100);
+        uint256 discountedPrice = tier.price *
+            ((100 - promoCode.discount) / 100);
         uint256 totalCost = discountedPrice * tierSize_;
-        uint256 influencerReward = discountedPrice * _influencerCommission / 100;
+        uint256 influencerReward = (discountedPrice * _influencerCommission) /
+            100;
 
         _influencerBalances[promoCode.influencer] += influencerReward;
         _promoCodes[promoCodeHash_].totalRedeemed += tierSize_;
-        
+
         // try transfer
         IERC20(_tokenAddress).transfer(address(this), totalCost);
 
@@ -554,13 +600,13 @@ contract MintTiers is
         require(tokenSize <= tier.maxPerTx, "MAX_PER_TX_EXCEEDED");
 
         // Check if max per wallet is not exceeded
-        if(!nftPayWhitelist[to]) {
+        if (!nftPayWhitelist[to]) {
             require(
                 _ownerTierBalance[to][tierId] + tokenSize <= tier.maxPerWallet,
                 "MAX_PER_WALLET_EXCEEDED"
             );
         }
-        
+
         // Mint tokens
         for (uint256 x = 0; x < tokenSize; x++) {
             uint256 tokenId = _maxTiers + (tier.supply * _maxTiers) + tierId;
@@ -626,7 +672,7 @@ contract MintTiers is
     function influencerCommission() external view virtual returns (uint256) {
         return _influencerCommission;
     }
-    
+
     function isPresaleActive(
         uint256 tierId
     ) external view virtual returns (bool) {
@@ -702,7 +748,7 @@ contract MintTiers is
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         return _ownerTierBalance[owner][tierId];
     }
-    
+
     function promoCodes(
         bytes32 promoCodeHash
     )
@@ -717,7 +763,10 @@ contract MintTiers is
             bool active
         )
     {
-        require(_promoCodes[promoCodeHash].discount > 0, "PROMO_CODE_DOES_NOT_EXIST");
+        require(
+            _promoCodes[promoCodeHash].discount > 0,
+            "PROMO_CODE_DOES_NOT_EXIST"
+        );
         PromoCode storage promoCode = _promoCodes[promoCodeHash];
         return (
             promoCode.tier,
@@ -729,7 +778,9 @@ contract MintTiers is
         );
     }
 
-    function influencerBalances(address influencer_) external view virtual returns (uint256) {
+    function influencerBalances(
+        address influencer_
+    ) external view virtual returns (uint256) {
         return _influencerBalances[influencer_];
     }
 
