@@ -1,7 +1,7 @@
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { Signer } from "ethers";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import keccak256 from "keccak256";
 import MerkleTree from "merkletreejs";
 import { ArchetypeAvatars, NRGY } from "../typechain-types";
@@ -48,19 +48,13 @@ describe("Archetype Avatars ", function () {
       "ArchetypeAvatars"
     );
 
-    aAvatars = (await upgrades.deployProxy(
-      aAvatarsContract,
-      [
-        "MNT",
-        "MNT",
-        "https://api.example.com/",
-        ownerAddress,
-        ownerAddress,
-        nrgy.address,
-      ],
-      {
-        kind: "uups",
-      }
+    aAvatars = (await aAvatarsContract.deploy(
+      "MNT",
+      "MNT",
+      "https://api.example.com/",
+      ownerAddress,
+      ownerAddress,
+      nrgy.address
     )) as ArchetypeAvatars;
 
     await aAvatars.deployed();
