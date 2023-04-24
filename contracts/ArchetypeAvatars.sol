@@ -19,10 +19,6 @@ Phase 1: Free claim for whitelisted addresses (address, max qty)
 Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, price)
 Phase 3: Pre-sale for whitelisted address w/ promo code option (address)
 Phase 4: Public sale w/ promo code option
-
-TODO: Events -emit influencer reward after promo code mint (to be used for an influencer leaderboard)
-TODO: Add minter role for airdrop by external contract
-TODO: Max per wallet: for each phase or same for all?
 */
 
 contract ArchetypeAvatars is
@@ -34,6 +30,8 @@ contract ArchetypeAvatars is
     using MerkleProof for bytes32[];
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
     address private _treasury;
     string private _tokenBaseURI;
     string private _contractURI;
@@ -44,8 +42,6 @@ contract ArchetypeAvatars is
         uint256 price;
         uint256 maxSupply;
         uint256 supply;
-        uint256 maxPerTx;
-        uint256 maxPerWallet;
     }
     mapping(uint256 => Tier) private _tiers;
 
@@ -76,8 +72,6 @@ contract ArchetypeAvatars is
     }
     mapping(string => PromoCode) private _promoCodes;
     mapping(address => uint256) public _influencerBalances;
-
-    mapping(address => bool) private _nftPayWhitelist;
 
     struct PhaseWhiteList {
         uint256 maxMint;
@@ -127,6 +121,34 @@ contract ArchetypeAvatars is
         _setDefaultRoyalty(receiver, royalty);
     }
 
+    // Set treasury address
+    function updateTreasury(
+        address newTreasury
+    ) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        _treasury = newTreasury;
+    }
+
+    // Mint function for extenral airdrop contract
+    function bulkMint(
+        address[] memory recipients,
+        uint256[] memory tierIds,
+        uint256[] memory tierSizes
+    ) external virtual onlyRole(MINTER_ROLE) {
+        require(recipients.length == tierIds.length, "INVALID_INPUT");
+        require(recipients.length == tierSizes.length, "INVALID_INPUT");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            require(tierIds[idx] <= _totalTiers, "TIER_UNAVAILABLE");
+            require(tierSizes[idx] > 0, "INVALID_SUPPLY");
+            require(
+                _tiers[tierIds[idx]].supply + tierSizes[idx] <=
+                    _tiers[tierIds[idx]].maxSupply,
+                "INVALID_SUPPLY"
+            );
+            _mintTier(recipients[idx], tierIds[idx], tierSizes[idx]);
+        }
+    }
+
     /**
     ////////////////////////////////////////////////////
     // Initial Functions 
@@ -137,17 +159,13 @@ contract ArchetypeAvatars is
     function initTier(
         uint256 id,
         uint256 price,
-        uint256 maxSupply,
-        uint256 maxPerTx,
-        uint256 maxPerWallet
+        uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _maxTiers, "TIER_UNAVAILABLE");
         require(_tiers[id].id == 0, "TIER_ALREADY_INITIALIZED");
         require(maxSupply > 0, "INVALID_SUPPLY");
-        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
-        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
 
-        _tiers[id] = Tier(id, price, maxSupply, 0, maxPerTx, maxPerWallet);
+        _tiers[id] = Tier(id, price, maxSupply, 0);
         _totalTiers++;
     }
 
@@ -155,20 +173,14 @@ contract ArchetypeAvatars is
     function updateTier(
         uint256 id,
         uint256 price,
-        uint256 maxSupply,
-        uint256 maxPerTx,
-        uint256 maxPerWallet
+        uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _totalTiers, "TIER_UNAVAILABLE");
         require(maxSupply > 0, "INVALID_SUPPLY");
         require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
-        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
-        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
 
         _tiers[id].price = price;
         _tiers[id].maxSupply = maxSupply;
-        _tiers[id].maxPerTx = maxPerTx;
-        _tiers[id].maxPerWallet = maxPerWallet;
     }
 
     // Update sale
@@ -176,18 +188,14 @@ contract ArchetypeAvatars is
         uint256 tierId,
         uint256 phase,
         uint256 saleStart,
-        uint256 saleEnd,
-        uint256 maxSupply
+        uint256 saleEnd
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(_sales[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
         require(saleStart < saleEnd, "INVALID_SALE_TIME");
-        require(maxSupply > _tiers[tierId].supply, "INVALID_SUPPLY");
 
         _sales[tierId][phase].saleStart = saleStart;
         _sales[tierId][phase].saleEnd = saleEnd;
-
-        _tiers[tierId].maxSupply = maxSupply;
     }
 
     function stopSale(
@@ -199,26 +207,34 @@ contract ArchetypeAvatars is
         _sales[tierId][phase].saleEnd = block.timestamp;
     }
 
-    // Withdraw all revenues
-    function withdraw() external virtual nonReentrant {
+    // Withdraw all amounts (revenue, influencer rewards, etc.)
+    function withdraw()
+        external
+        virtual
+        nonReentrant
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         uint256 balance = IERC20(_paymentToken).balanceOf(address(this));
         require(balance > 0, "ZERO_BALANCE");
         IERC20(_paymentToken).transfer(_treasury, balance);
     }
 
-    // Withdraw influencer rewards
-    function withdrawInfluencerRewards() external virtual nonReentrant {
-        uint256 reward = _influencerBalances[msg.sender];
-        require(reward > 0, "ZERO_BALANCE");
-        _influencerBalances[msg.sender] = 0;
-        IERC20(_paymentToken).transfer(msg.sender, reward);
+    // Withdraw all revenues
+    function withdrawRevenue() external virtual nonReentrant {
+        uint256 revenue = _totalRevenue;
+        require(revenue > 0, "ZERO_BALANCE");
+        _totalRevenue = 0;
+        IERC20(_paymentToken).transfer(_treasury, revenue);
     }
 
-    function updateToNftPayWhitelist(
-        address whitelistAddress,
-        bool enable
-    ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
-        _nftPayWhitelist[whitelistAddress] = enable;
+    // Withdraw influencer rewards
+    function withdrawInfluencerRewards(
+        address _infulencer
+    ) external virtual nonReentrant {
+        uint256 reward = _influencerBalances[_infulencer];
+        require(reward > 0, "ZERO_BALANCE");
+        _influencerBalances[_infulencer] = 0;
+        IERC20(_paymentToken).transfer(_infulencer, reward);
     }
 
     function updatePromoCode(
@@ -380,24 +396,20 @@ contract ArchetypeAvatars is
         address[] memory recipients,
         uint256 startTime,
         uint256 endTime,
-        uint256 maxPerWallet,
-        uint256 maxPerTx
+        uint256 maxMint
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_PRESALE_TIME");
-        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
+        require(maxMint > 0, "INVALID_MAX_MINT");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             _phaseWhitelist[recipients[idx]][tokenTier][3] = PhaseWhiteList(
-                maxPerWallet,
+                maxMint,
                 0,
                 0
             );
         }
         _sales[tokenTier][3] = Sale(tokenTier, startTime, endTime);
-        _tiers[tokenTier].maxPerTx = maxPerTx;
-        _tiers[tokenTier].maxPerWallet = maxPerWallet;
     }
 
     function mintPhase3(
@@ -438,11 +450,15 @@ contract ArchetypeAvatars is
                 "INSUFFICIENT_FUND"
             );
 
+            _promoCodes[promo].totalRedeemed += tierSize;
             // Update Revenue
             uint256 influencerReward = (discountedPrice *
                 promoCode.commission) / 100;
-            _influencerBalances[promoCode.influencer] += influencerReward;
-            _promoCodes[promo].totalRedeemed += tierSize;
+
+            _influencerBalances[promoCode.influencer] =
+                _influencerBalances[promoCode.influencer] +
+                influencerReward;
+
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
         } else {
             // Update Revenue
@@ -479,19 +495,13 @@ contract ArchetypeAvatars is
         uint256 tokenTier,
         uint256 startTime,
         uint256 endTime,
-        uint256 maxSupply,
-        uint256 maxPerWallet,
-        uint256 maxPerTx
+        uint256 maxSupply
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_SALE_TIME");
         require(maxSupply > _tiers[tokenTier].supply, "INVALID_SUPPLY");
-        require(maxPerWallet > 0, "INVALID_MAX_PER_WALLET");
-        require(maxPerTx > 0, "INVALID_MAX_PER_TX");
 
         _sales[tokenTier][4] = Sale(tokenTier, startTime, endTime);
-        _tiers[tokenTier].maxPerTx = maxPerTx;
-        _tiers[tokenTier].maxPerWallet = maxPerWallet;
         _tiers[tokenTier].maxSupply = maxSupply;
     }
 
@@ -527,7 +537,11 @@ contract ArchetypeAvatars is
             // Update Revenue
             uint256 influencerReward = (discountedPrice *
                 promoCode.commission) / 100;
-            _influencerBalances[promoCode.influencer] += influencerReward;
+
+            _influencerBalances[promoCode.influencer] =
+                _influencerBalances[promoCode.influencer] +
+                influencerReward;
+
             _promoCodes[promo].totalRedeemed += tierSize;
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
         } else {
@@ -568,18 +582,6 @@ contract ArchetypeAvatars is
             tier.supply + tokenSize <= tier.maxSupply,
             "MAX_SUPPLY_EXCEEDED"
         );
-
-        // Check if max per tx is not exceeded
-        require(tokenSize <= tier.maxPerTx, "MAX_PER_TX_EXCEEDED");
-
-        // Check if max per wallet is not exceeded
-        // TODO: Check if this is correct
-        if (!_nftPayWhitelist[to]) {
-            require(
-                _ownerTierBalance[to][tierId] + tokenSize <= tier.maxPerWallet,
-                "MAX_PER_WALLET_EXCEEDED"
-            );
-        }
 
         // Mint tokens
         for (uint256 x = 0; x < tokenSize; x++) {
@@ -649,12 +651,6 @@ contract ArchetypeAvatars is
         return _influencerBalances[influencer];
     }
 
-    function nftPayWhitelist(
-        address nftPay
-    ) external view virtual returns (bool) {
-        return _nftPayWhitelist[nftPay];
-    }
-
     function phaseWhitelisted(
         address wallet,
         uint256 tier,
@@ -665,26 +661,10 @@ contract ArchetypeAvatars is
 
     function tiers(
         uint256 tierId
-    )
-        external
-        view
-        returns (
-            uint256 price,
-            uint256 supply,
-            uint256 maxSupply,
-            uint256 maxPerTx,
-            uint256 maxPerWallet
-        )
-    {
+    ) external view returns (uint256 price, uint256 supply, uint256 maxSupply) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         Tier storage tier = _tiers[tierId];
-        return (
-            tier.price,
-            tier.supply,
-            tier.maxSupply,
-            tier.maxPerTx,
-            tier.maxPerWallet
-        );
+        return (tier.price, tier.supply, tier.maxSupply);
     }
 
     function sales(

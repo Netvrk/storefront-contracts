@@ -12,9 +12,13 @@ describe("Archetype Avatars ", function () {
   let owner: Signer;
   let user: Signer;
   let user2: Signer;
+  let treasury: Signer;
+  let infulencer: Signer;
   let ownerAddress: string;
   let userAddress: string;
   let user2Address: string;
+  let treasuryAddress: string;
+  let infulencerAddress: string;
 
   let merkleRoot: string;
   let ownerMerkleProof: string[];
@@ -23,10 +27,12 @@ describe("Archetype Avatars ", function () {
   let now: number;
 
   before(async function () {
-    [owner, user, user2] = await ethers.getSigners();
+    [owner, user, user2, treasury, infulencer] = await ethers.getSigners();
     ownerAddress = await owner.getAddress();
     userAddress = await user.getAddress();
     user2Address = await user2.getAddress();
+    treasuryAddress = await treasury.getAddress();
+    infulencerAddress = await infulencer.getAddress();
 
     // Merkle root and proof for the owner and user addresses
     const leaves = [ownerAddress, userAddress].map((x) => keccak256(x));
@@ -56,7 +62,7 @@ describe("Archetype Avatars ", function () {
       "MNT",
       "MNT",
       "https://api.example.com/",
-      ownerAddress,
+      treasuryAddress,
       ownerAddress,
       nrgy.address
     )) as ArchetypeAvatars;
@@ -91,41 +97,33 @@ describe("Archetype Avatars ", function () {
       (await avatar.royaltyInfo(1, ethers.utils.parseEther("1")))[1]
     );
     expect(royaltyAmount, "0.1");
-    expect(await avatar.treasury()).to.be.equal(ownerAddress);
+    expect(await avatar.treasury()).to.be.equal(treasuryAddress);
   });
 
   it("Initialize Tier", async function () {
     await expect(
-      avatar.connect(user).initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.connect(user).initTier(1, ethers.utils.parseEther("1"), 20)
     ).to.be.reverted;
 
     await expect(avatar.tiers(6)).to.be.revertedWith("TIER_UNAVAILABLE");
 
     await expect(
-      avatar.initTier(101, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.initTier(101, ethers.utils.parseEther("1"), 20)
     ).to.be.revertedWith("TIER_UNAVAILABLE");
     await expect(
-      avatar.initTier(1, ethers.utils.parseEther("1"), 0, 2, 5)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 0)
     ).to.be.revertedWith("INVALID_SUPPLY");
 
-    await expect(
-      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 0, 5)
-    ).to.be.revertedWith("INVALID_MAX_PER_TX");
+    await avatar.initTier(1, ethers.utils.parseEther("1"), 20);
+
+    await avatar.initTier(2, ethers.utils.parseEther("0"), 20);
+
+    await avatar.initTier(3, ethers.utils.parseEther("1"), 20);
+
+    await avatar.initTier(4, ethers.utils.parseEther("1"), 20);
 
     await expect(
-      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 0)
-    ).to.be.revertedWith("INVALID_MAX_PER_WALLET");
-
-    await avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5);
-
-    await avatar.initTier(2, ethers.utils.parseEther("0"), 20, 2, 5);
-
-    await avatar.initTier(3, ethers.utils.parseEther("1"), 20, 2, 5);
-
-    await avatar.initTier(4, ethers.utils.parseEther("1"), 20, 2, 5);
-
-    await expect(
-      avatar.initTier(1, ethers.utils.parseEther("1"), 20, 2, 5)
+      avatar.initTier(1, ethers.utils.parseEther("1"), 20)
     ).to.be.revertedWith("TIER_ALREADY_INITIALIZED");
 
     expect((await avatar.totalTiers()).toNumber()).to.be.equal(4);
@@ -200,7 +198,7 @@ describe("Archetype Avatars ", function () {
   });
 
   it("Add Promo Code", async function () {
-    await avatar.updatePromoCode(1, "xyz", ownerAddress, 12, 10, 5, true);
+    await avatar.updatePromoCode(1, "xyz", infulencerAddress, 12, 10, 5, true);
     expect((await avatar.promoCodeInfo("xyz")).active).to.be.true;
   });
 
@@ -212,22 +210,19 @@ describe("Archetype Avatars ", function () {
       [ownerAddress, userAddress],
       startTime,
       endTime,
-      4,
       2
     );
 
     await avatar.mintPhase3(1, 1, "xyz");
-    await expect(avatar.mintPhase3(1, 2, "abc")).to.be.revertedWith(
-      "PROMO_NOT_ACTIVE"
-    );
-    await expect(avatar.mintPhase3(1, 2, "xyz")).to.be.revertedWith(
-      "MAX_PER_WALLET_EXCEEDED"
-    );
 
     await avatar.mintPhase3(1, 1, "");
+
+    await expect(avatar.mintPhase3(1, 1, "xyz")).to.be.revertedWith(
+      "MAX_MINT_EXCEEDED"
+    );
   });
 
-  it("Remove Promo Code", async function () {
+  it("Remove Promo Code & Check invalid promo", async function () {
     await avatar.updatePromoCode(
       0,
       "xyz",
@@ -238,19 +233,23 @@ describe("Archetype Avatars ", function () {
       false
     );
 
-    await expect(avatar.mintPhase3(1, 2, "xyz")).to.be.revertedWith(
-      "PROMO_NOT_ACTIVE"
-    );
+    await expect(
+      avatar.connect(user).mintPhase3(1, 2, "xyz")
+    ).to.be.revertedWith("PROMO_NOT_ACTIVE");
 
     expect((await avatar.promoCodeInfo("xyz")).active).to.be.false;
+
+    await expect(
+      avatar.connect(user).mintPhase3(1, 1, "abc")
+    ).to.be.revertedWith("PROMO_NOT_ACTIVE");
   });
 
   it("Phase 4", async function () {
-    await avatar.updatePromoCode(1, "abc", ownerAddress, 12, 10, 5, true);
+    await avatar.updatePromoCode(1, "abc", infulencerAddress, 12, 10, 5, true);
 
     const startTime = now;
     const endTime = now + 1000;
-    await avatar.initPhase4(1, startTime, endTime, 20, 7, 2);
+    await avatar.initPhase4(1, startTime, endTime, 20);
 
     await avatar.connect(user).mintPhase4(1, 1, "abc");
 
@@ -258,10 +257,28 @@ describe("Archetype Avatars ", function () {
   });
 
   it("Withdraw", async function () {
-    const balance = await owner.getBalance();
-    await avatar.withdraw();
-    const balance2 = await owner.getBalance();
-    expect(balance2.toString()).to.not.equal(balance.toString());
+    const totalContractBalance = await nrgy.balanceOf(avatar.address);
+    const revenue = await avatar.totalRevenue();
+
+    await avatar.withdrawRevenue();
+    const treasuryBalance2 = await nrgy.balanceOf(treasuryAddress);
+
+    const infulence = await avatar.influencerBalances(infulencerAddress);
+    await avatar
+      .connect(infulencer)
+      .withdrawInfluencerRewards(infulencerAddress);
+    const infulencerBalance2 = await nrgy.balanceOf(infulencerAddress);
+
+    expect(revenue.add(infulence).toString()).to.equal(
+      totalContractBalance.toString()
+    );
+
+    expect(infulencerBalance2.add(treasuryBalance2).toString()).to.equal(
+      totalContractBalance.toString()
+    );
+
+    const remainingBalance = await nrgy.balanceOf(avatar.address);
+    expect(remainingBalance).to.equal(0);
     await expect(avatar.withdraw()).to.be.revertedWith("ZERO_BALANCE");
   });
 });
