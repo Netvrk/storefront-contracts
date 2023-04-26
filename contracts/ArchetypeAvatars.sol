@@ -44,7 +44,7 @@ contract ArchetypeAvatars is
         uint256 maxSupply;
         uint256 supply;
     }
-    mapping(uint256 => Tier) private _tiers;
+    mapping(uint256 => Tier) private _tier;
 
     // TIER BALANCES & REVENUE
     mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
@@ -146,10 +146,10 @@ contract ArchetypeAvatars is
         uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _maxTiers, "TIER_UNAVAILABLE");
-        require(_tiers[id].id == 0, "TIER_ALREADY_INITIALIZED");
+        require(_tier[id].id == 0, "TIER_ALREADY_INITIALIZED");
         require(maxSupply > 0, "INVALID_MAX_SUPPLY");
 
-        _tiers[id] = Tier(id, price, maxSupply, 0);
+        _tier[id] = Tier(id, price, maxSupply, 0);
         _totalTiers++;
     }
 
@@ -161,10 +161,10 @@ contract ArchetypeAvatars is
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _totalTiers, "TIER_UNAVAILABLE");
         require(maxSupply > 0, "INVALID_MAX_SUPPLY");
-        require(maxSupply > _tiers[id].supply, "INVALID_MAX_SUPPLY");
+        require(maxSupply > _tier[id].supply, "INVALID_MAX_SUPPLY");
 
-        _tiers[id].price = price;
-        _tiers[id].maxSupply = maxSupply;
+        _tier[id].price = price;
+        _tier[id].maxSupply = maxSupply;
     }
 
     // Update sale
@@ -364,8 +364,8 @@ contract ArchetypeAvatars is
             require(tierIds[idx] <= _totalTiers, "TIER_UNAVAILABLE");
             require(tierSizes[idx] > 0, "INVALID_MAX_SUPPLY");
             require(
-                _tiers[tierIds[idx]].supply + tierSizes[idx] <=
-                    _tiers[tierIds[idx]].maxSupply,
+                _tier[tierIds[idx]].supply + tierSizes[idx] <=
+                    _tier[tierIds[idx]].maxSupply,
                 "INVALID_MAX_SUPPLY"
             );
             _mintTier(recipients[idx], tierIds[idx], tierSizes[idx]);
@@ -416,7 +416,7 @@ contract ArchetypeAvatars is
 
         // Calculate total cost
         uint256 discount = _phaseWhitelist[msg.sender][tokenTier][2].discount;
-        Tier storage tier = _tiers[tokenTier];
+        Tier storage tier = _tier[tokenTier];
         uint256 discountedPrice = (tier.price * (100 - discount)) / 100;
         uint256 totalCost = discountedPrice * tierSize;
 
@@ -461,7 +461,7 @@ contract ArchetypeAvatars is
         );
 
         // Calculate total cost
-        Tier storage tier = _tiers[tokenTier];
+        Tier storage tier = _tier[tokenTier];
         uint256 totalCost = 0;
 
         // Check Promo
@@ -531,7 +531,7 @@ contract ArchetypeAvatars is
         require(_isSaleActive(tokenTier, 4), "SALE_NOT_ACTIVE");
 
         // Calculate total cost
-        Tier storage tier = _tiers[tokenTier];
+        Tier storage tier = _tier[tokenTier];
         uint256 totalCost = 0;
 
         // Check promo code
@@ -595,7 +595,7 @@ contract ArchetypeAvatars is
     */
 
     function _mintTier(address to, uint256 tierId, uint256 tokenSize) internal {
-        Tier storage tier = _tiers[tierId];
+        Tier storage tier = _tier[tierId];
 
         // Check if tier is sold out
         require(
@@ -715,7 +715,7 @@ contract ArchetypeAvatars is
         uint256 tierId
     ) external view returns (uint256 price, uint256 supply, uint256 maxSupply) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        Tier storage tier = _tiers[tierId];
+        Tier storage tier = _tier[tierId];
         return (tier.price, tier.supply, tier.maxSupply);
     }
 
