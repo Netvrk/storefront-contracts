@@ -105,14 +105,14 @@ describe("Archetype Avatars ", function () {
       avatar.connect(user).initTier(1, ethers.utils.parseEther("1"), 20)
     ).to.be.reverted;
 
-    await expect(avatar.tiers(6)).to.be.revertedWith("TIER_UNAVAILABLE");
+    await expect(avatar.tierInfo(6)).to.be.revertedWith("TIER_UNAVAILABLE");
 
     await expect(
       avatar.initTier(101, ethers.utils.parseEther("1"), 20)
     ).to.be.revertedWith("TIER_UNAVAILABLE");
     await expect(
       avatar.initTier(1, ethers.utils.parseEther("1"), 0)
-    ).to.be.revertedWith("INVALID_SUPPLY");
+    ).to.be.revertedWith("INVALID_MAX_SUPPLY");
 
     await avatar.initTier(1, ethers.utils.parseEther("1"), 20);
 
@@ -128,7 +128,7 @@ describe("Archetype Avatars ", function () {
 
     expect((await avatar.totalTiers()).toNumber()).to.be.equal(4);
 
-    const tier1 = await avatar.tiers(1);
+    const tier1 = await avatar.tierInfo(1);
     expect(tier1.price).to.be.equal(ethers.utils.parseEther("1"));
   });
 
@@ -199,7 +199,7 @@ describe("Archetype Avatars ", function () {
 
   it("Add Promo Code", async function () {
     await avatar.updatePromoCode(1, "xyz", infulencerAddress, 12, 10, 5, true);
-    expect((await avatar.promoCodeInfo("xyz")).active).to.be.true;
+    expect((await avatar.promoInfo("xyz")).active).to.be.true;
   });
 
   it("Phase 3", async function () {
@@ -233,15 +233,7 @@ describe("Archetype Avatars ", function () {
       false
     );
 
-    await expect(
-      avatar.connect(user).mintPhase3(1, 2, "xyz")
-    ).to.be.revertedWith("PROMO_NOT_ACTIVE");
-
-    expect((await avatar.promoCodeInfo("xyz")).active).to.be.false;
-
-    await expect(
-      avatar.connect(user).mintPhase3(1, 1, "abc")
-    ).to.be.revertedWith("PROMO_NOT_ACTIVE");
+    expect((await avatar.promoInfo("xyz")).active).to.be.false;
   });
 
   it("Phase 4", async function () {
@@ -249,7 +241,7 @@ describe("Archetype Avatars ", function () {
 
     const startTime = now;
     const endTime = now + 1000;
-    await avatar.initPhase4(1, startTime, endTime, 20);
+    await avatar.initPhase4(1, startTime, endTime);
 
     await avatar.connect(user).mintPhase4(1, 1, "abc");
 
@@ -263,17 +255,17 @@ describe("Archetype Avatars ", function () {
     await avatar.withdrawRevenue();
     const treasuryBalance2 = await nrgy.balanceOf(treasuryAddress);
 
-    const infulence = await avatar.influencerBalances(infulencerAddress);
+    const infulence = await avatar.influencerRevenue(infulencerAddress);
     await avatar
       .connect(infulencer)
       .withdrawInfluencerRewards(infulencerAddress);
-    const infulencerBalance2 = await nrgy.balanceOf(infulencerAddress);
+    const infulencerRevenue2 = await nrgy.balanceOf(infulencerAddress);
 
     expect(revenue.add(infulence).toString()).to.equal(
       totalContractBalance.toString()
     );
 
-    expect(infulencerBalance2.add(treasuryBalance2).toString()).to.equal(
+    expect(infulencerRevenue2.add(treasuryBalance2).toString()).to.equal(
       totalContractBalance.toString()
     );
 

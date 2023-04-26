@@ -37,6 +37,7 @@ contract ArchetypeAvatars is
     string private _contractURI;
     address private _paymentToken;
 
+    // TIER
     struct Tier {
         uint256 id;
         uint256 price;
@@ -45,22 +46,25 @@ contract ArchetypeAvatars is
     }
     mapping(uint256 => Tier) private _tiers;
 
+    // TIER BALANCES & REVENUE
+    mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
+    mapping(address => mapping(uint256 => mapping(uint256 => uint256)))
+        private _ownerTierToken;
+
+    uint256 private _totalRevenue;
+    uint256 private constant _maxTiers = 100;
+    uint256 private _totalTiers;
+
+    // SALES
     struct Sale {
         uint256 id;
         uint256 saleStart;
         uint256 saleEnd;
     }
     // Tier => Phase => Sale
-    mapping(uint256 => mapping(uint256 => Sale)) private _sales;
+    mapping(uint256 => mapping(uint256 => Sale)) private _sale;
 
-    mapping(address => mapping(uint256 => uint256)) private _ownerTierBalance;
-    mapping(address => mapping(uint256 => mapping(uint256 => uint256)))
-        private _ownerTierTokens;
-
-    uint256 private _totalRevenue;
-    uint256 private constant _maxTiers = 100;
-    uint256 private _totalTiers;
-
+    // PROMO CODES
     struct PromoCode {
         uint256 tier;
         address influencer;
@@ -70,9 +74,10 @@ contract ArchetypeAvatars is
         uint256 totalRedeemed;
         bool active;
     }
-    mapping(string => PromoCode) private _promoCodes;
-    mapping(address => uint256) public _influencerBalances;
+    mapping(string => PromoCode) private _promoCode;
+    mapping(address => uint256) public _influencerRevenue;
 
+    // WHITELIST
     struct PhaseWhiteList {
         uint256 maxMint;
         uint256 discount;
@@ -87,11 +92,11 @@ contract ArchetypeAvatars is
         string memory symbol_,
         string memory baseURI_,
         address treasury_,
-        address manager,
+        address manager_,
         address paymentToken_
     ) ERC721(name_, symbol_) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MANAGER_ROLE, manager);
+        _setupRole(MANAGER_ROLE, manager_);
 
         _tokenBaseURI = baseURI_;
         _treasury = treasury_;
@@ -128,27 +133,6 @@ contract ArchetypeAvatars is
         _treasury = newTreasury;
     }
 
-    // Mint function for extenral airdrop contract
-    function bulkMint(
-        address[] memory recipients,
-        uint256[] memory tierIds,
-        uint256[] memory tierSizes
-    ) external virtual onlyRole(MINTER_ROLE) {
-        require(recipients.length == tierIds.length, "INVALID_INPUT");
-        require(recipients.length == tierSizes.length, "INVALID_INPUT");
-
-        for (uint256 idx = 0; idx < recipients.length; idx++) {
-            require(tierIds[idx] <= _totalTiers, "TIER_UNAVAILABLE");
-            require(tierSizes[idx] > 0, "INVALID_SUPPLY");
-            require(
-                _tiers[tierIds[idx]].supply + tierSizes[idx] <=
-                    _tiers[tierIds[idx]].maxSupply,
-                "INVALID_SUPPLY"
-            );
-            _mintTier(recipients[idx], tierIds[idx], tierSizes[idx]);
-        }
-    }
-
     /**
     ////////////////////////////////////////////////////
     // Initial Functions 
@@ -163,7 +147,7 @@ contract ArchetypeAvatars is
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _maxTiers, "TIER_UNAVAILABLE");
         require(_tiers[id].id == 0, "TIER_ALREADY_INITIALIZED");
-        require(maxSupply > 0, "INVALID_SUPPLY");
+        require(maxSupply > 0, "INVALID_MAX_SUPPLY");
 
         _tiers[id] = Tier(id, price, maxSupply, 0);
         _totalTiers++;
@@ -176,8 +160,8 @@ contract ArchetypeAvatars is
         uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(id <= _totalTiers, "TIER_UNAVAILABLE");
-        require(maxSupply > 0, "INVALID_SUPPLY");
-        require(maxSupply > _tiers[id].supply, "INVALID_SUPPLY");
+        require(maxSupply > 0, "INVALID_MAX_SUPPLY");
+        require(maxSupply > _tiers[id].supply, "INVALID_MAX_SUPPLY");
 
         _tiers[id].price = price;
         _tiers[id].maxSupply = maxSupply;
@@ -191,11 +175,11 @@ contract ArchetypeAvatars is
         uint256 saleEnd
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_sales[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
+        require(_sale[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
         require(saleStart < saleEnd, "INVALID_SALE_TIME");
 
-        _sales[tierId][phase].saleStart = saleStart;
-        _sales[tierId][phase].saleEnd = saleEnd;
+        _sale[tierId][phase].saleStart = saleStart;
+        _sale[tierId][phase].saleEnd = saleEnd;
     }
 
     function stopSale(
@@ -203,8 +187,8 @@ contract ArchetypeAvatars is
         uint256 phase
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_sales[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
-        _sales[tierId][phase].saleEnd = block.timestamp;
+        require(_sale[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
+        _sale[tierId][phase].saleEnd = block.timestamp;
     }
 
     // Withdraw all amounts (revenue, influencer rewards, etc.)
@@ -221,20 +205,21 @@ contract ArchetypeAvatars is
 
     // Withdraw all revenues
     function withdrawRevenue() external virtual nonReentrant {
-        uint256 revenue = _totalRevenue;
-        require(revenue > 0, "ZERO_BALANCE");
+        require(_totalRevenue > 0, "ZERO_BALANCE");
+        IERC20(_paymentToken).transfer(_treasury, _totalRevenue);
         _totalRevenue = 0;
-        IERC20(_paymentToken).transfer(_treasury, revenue);
     }
 
     // Withdraw influencer rewards
     function withdrawInfluencerRewards(
         address _infulencer
     ) external virtual nonReentrant {
-        uint256 reward = _influencerBalances[_infulencer];
-        require(reward > 0, "ZERO_BALANCE");
-        _influencerBalances[_infulencer] = 0;
-        IERC20(_paymentToken).transfer(_infulencer, reward);
+        require(_influencerRevenue[_infulencer] > 0, "ZERO_BALANCE");
+        IERC20(_paymentToken).transfer(
+            _infulencer,
+            _influencerRevenue[_infulencer]
+        );
+        _influencerRevenue[_infulencer] = 0;
     }
 
     function updatePromoCode(
@@ -246,25 +231,28 @@ contract ArchetypeAvatars is
         uint256 maxRedeemable,
         bool active
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
+        require(tier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(bytes(promo).length > 0, "INVALID_PROMO_CODE");
         require(discount < 100, "INVALID_DISCOUNT");
         require(commission < 100, "INVALID_COMMISION");
 
-        _promoCodes[promo] = PromoCode(
+        _promoCode[promo] = PromoCode(
             tier,
             infuencer,
             discount,
             commission,
             maxRedeemable,
-            _promoCodes[promo].totalRedeemed,
+            _promoCode[promo].totalRedeemed,
             active
         );
     }
 
     /*##################################################
-    ################## PHASE 1 #########################
-    ###### FREE CLAIMS - NETVRK NFT STAKERS ############
+    ############ MINT INITIALIZATIONS ##################
     ####################################################
     */
+    // PHASE 1: FREE CLAIMS - NETVRK NFT STAKERS
+
     function initPhase1(
         uint256 tokenTier,
         address[] memory recipients,
@@ -277,43 +265,20 @@ contract ArchetypeAvatars is
             "INVALID_INPUT_LENGTHS"
         );
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(startTime < endTime, "INVALID_PRESALE_TIME");
+        require(startTime < endTime, "INVALID_SALE_TIME");
+        require(endTime > block.timestamp, "INVALID_SALE_TIME");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             _phaseWhitelist[recipients[idx]][tokenTier][1] = PhaseWhiteList(
                 freeClaims[idx],
-                100,
+                0,
                 0
             );
         }
-        _sales[tokenTier][1] = Sale(tokenTier, startTime, endTime);
+        _sale[tokenTier][1] = Sale(tokenTier, startTime, endTime);
     }
 
-    // Phase 1: Free claim for whitelisted addresses (address, max qty)
-    function mintPhase1(
-        uint256 tokenTier,
-        uint256 tierSize
-    ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier, 1), "SALE_NOT_ACTIVE");
-        require(
-            _phaseWhitelist[msg.sender][tokenTier][1].maxMint > 0,
-            "USER_NOT_WHITELISTED"
-        );
-        require(
-            _phaseWhitelist[msg.sender][tokenTier][1].minted + tierSize <=
-                _phaseWhitelist[msg.sender][tokenTier][1].maxMint,
-            "MAX_MINT_EXCEEDED"
-        );
-        _phaseWhitelist[msg.sender][tokenTier][1].minted += tierSize;
-        _mintTier(msg.sender, tokenTier, tierSize);
-    }
-
-    /*##################################################
-    ################## PHASE 2 #########################
-    ######## WHITELIST - NETVRK NFT STAKERS ############
-    ####################################################
-    */
+    // PHASE 2: WHITELIST - NETVRK NFT STAKERS
 
     function initPhase2(
         uint256 tokenTier,
@@ -329,7 +294,8 @@ contract ArchetypeAvatars is
         );
         require(recipients.length == discounts.length, "INVALID_INPUT_LENGTHS");
         require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(startTime < endTime, "INVALID_PRESALE_TIME");
+        require(startTime < endTime, "INVALID_SALE_TIME");
+        require(endTime > block.timestamp, "INVALID_SALE_TIME");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             _phaseWhitelist[recipients[idx]][tokenTier][2] = PhaseWhiteList(
@@ -338,10 +304,100 @@ contract ArchetypeAvatars is
                 0
             );
         }
-        _sales[tokenTier][2] = Sale(tokenTier, startTime, endTime);
+        _sale[tokenTier][2] = Sale(tokenTier, startTime, endTime);
     }
 
-    // Phase 2: Pre-sale for whitelisted addresses w/ bonus pack discounts (address, max qty, discount)
+    // PHASE 3: WHITELIST - WHITELIST - PARTNER PROJECTS
+
+    function initPhase3(
+        uint256 tokenTier,
+        address[] memory recipients,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 maxMint
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_SALE_TIME");
+        require(endTime > block.timestamp, "INVALID_SALE_TIME");
+        require(maxMint > 0, "INVALID_MAX_MINT");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            _phaseWhitelist[recipients[idx]][tokenTier][3] = PhaseWhiteList(
+                maxMint,
+                0,
+                0
+            );
+        }
+        _sale[tokenTier][3] = Sale(tokenTier, startTime, endTime);
+    }
+
+    // PHASE 4: PUBLIC SALE
+
+    function initPhase4(
+        uint256 tokenTier,
+        uint256 startTime,
+        uint256 endTime
+    ) external nonReentrant onlyRole(MANAGER_ROLE) {
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(startTime < endTime, "INVALID_SALE_TIME");
+        require(endTime > block.timestamp, "INVALID_SALE_TIME");
+
+        _sale[tokenTier][4] = Sale(tokenTier, startTime, endTime);
+    }
+
+    /*##################################################
+    ############### MINT FUNCTIONS #####################
+    ####################################################
+    */
+
+    // PHASE 0: AIRDROP FROM EXTERNAL CONTRACT
+
+    function bulkMint(
+        address[] memory recipients,
+        uint256[] memory tierIds,
+        uint256[] memory tierSizes
+    ) external virtual onlyRole(MINTER_ROLE) {
+        require(recipients.length == tierIds.length, "INVALID_INPUT");
+        require(recipients.length == tierSizes.length, "INVALID_INPUT");
+
+        for (uint256 idx = 0; idx < recipients.length; idx++) {
+            require(tierIds[idx] <= _totalTiers, "TIER_UNAVAILABLE");
+            require(tierSizes[idx] > 0, "INVALID_MAX_SUPPLY");
+            require(
+                _tiers[tierIds[idx]].supply + tierSizes[idx] <=
+                    _tiers[tierIds[idx]].maxSupply,
+                "INVALID_MAX_SUPPLY"
+            );
+            _mintTier(recipients[idx], tierIds[idx], tierSizes[idx]);
+        }
+    }
+
+    // PHASE 1: FREE CLAIMS - NETVRK NFT STAKERS
+
+    function mintPhase1(
+        uint256 tokenTier,
+        uint256 tierSize
+    ) external virtual nonReentrant {
+        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_isSaleActive(tokenTier, 1), "SALE_NOT_ACTIVE");
+        require(
+            _phaseWhitelist[msg.sender][tokenTier][1].maxMint > 0,
+            "USER_NOT_WHITELISTED"
+        );
+        require(
+            _phaseWhitelist[msg.sender][tokenTier][1].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tokenTier][1].maxMint,
+            "MAX_MINT_EXCEEDED"
+        );
+        // Update minted
+        _phaseWhitelist[msg.sender][tokenTier][1].minted += tierSize;
+
+        // Mint tier
+        _mintTier(msg.sender, tokenTier, tierSize);
+    }
+
+    // PHASE 2: WHITELIST - NETVRK NFT STAKERS
+
     function mintPhase2(
         uint256 tokenTier,
         uint256 tierSize
@@ -385,32 +441,7 @@ contract ArchetypeAvatars is
         _mintTier(msg.sender, tokenTier, tierSize);
     }
 
-    /*##################################################
-    ################## PHASE 3 #########################
-    ######### WHITELIST - PARTNER PROJECTS #############
-    ####################################################
-    */
-
-    function initPhase3(
-        uint256 tokenTier,
-        address[] memory recipients,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 maxMint
-    ) external nonReentrant onlyRole(MANAGER_ROLE) {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(startTime < endTime, "INVALID_PRESALE_TIME");
-        require(maxMint > 0, "INVALID_MAX_MINT");
-
-        for (uint256 idx = 0; idx < recipients.length; idx++) {
-            _phaseWhitelist[recipients[idx]][tokenTier][3] = PhaseWhiteList(
-                maxMint,
-                0,
-                0
-            );
-        }
-        _sales[tokenTier][3] = Sale(tokenTier, startTime, endTime);
-    }
+    // PHASE 3: WHITELIST - WHITELIST - PARTNER PROJECTS
 
     function mintPhase3(
         uint256 tokenTier,
@@ -432,14 +463,17 @@ contract ArchetypeAvatars is
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
         uint256 totalCost = 0;
-        if (bytes(promo).length > 0) {
-            PromoCode memory promoCode = _promoCodes[promo];
-            require(promoCode.active == true, "PROMO_NOT_ACTIVE");
+
+        // Check Promo
+        PromoCode memory promoCode = _promoCode[promo];
+        if (promoCode.active) {
+            require(promoCode.tier == tokenTier, "PROMO_INVALID_TIER");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
-                "PROMO_MAX_REDEEMABLE_EXCEEDED"
+                "PROMO_MAX_REDEEMED"
             );
-            require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
+
+            // Calculate total cost
             uint256 discountedPrice = (tier.price *
                 (100 - promoCode.discount)) / 100;
             totalCost = discountedPrice * tierSize;
@@ -450,16 +484,17 @@ contract ArchetypeAvatars is
                 "INSUFFICIENT_FUND"
             );
 
-            _promoCodes[promo].totalRedeemed += tierSize;
-            // Update Revenue
-            uint256 influencerReward = (discountedPrice *
-                promoCode.commission) / 100;
+            // Update Revenue and Influencer reward
+            uint256 influencerReward = (totalCost * promoCode.commission) / 100;
 
-            _influencerBalances[promoCode.influencer] =
-                _influencerBalances[promoCode.influencer] +
+            _influencerRevenue[promoCode.influencer] =
+                _influencerRevenue[promoCode.influencer] +
                 influencerReward;
 
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
+
+            // Update Promo Redeemed
+            _promoCode[promo].totalRedeemed += tierSize;
         } else {
             // Update Revenue
             totalCost = tier.price * tierSize;
@@ -485,25 +520,7 @@ contract ArchetypeAvatars is
         _mintTier(msg.sender, tokenTier, tierSize);
     }
 
-    /*##################################################
-    ################## PHASE 4 #########################
-    ################ PUBLIC SALE #######################
-    ####################################################
-    */
-
-    function initPhase4(
-        uint256 tokenTier,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 maxSupply
-    ) external nonReentrant onlyRole(MANAGER_ROLE) {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(startTime < endTime, "INVALID_SALE_TIME");
-        require(maxSupply > _tiers[tokenTier].supply, "INVALID_SUPPLY");
-
-        _sales[tokenTier][4] = Sale(tokenTier, startTime, endTime);
-        _tiers[tokenTier].maxSupply = maxSupply;
-    }
+    // PHASE 4: PUBLIC SALE
 
     function mintPhase4(
         uint256 tokenTier,
@@ -516,14 +533,17 @@ contract ArchetypeAvatars is
         // Calculate total cost
         Tier storage tier = _tiers[tokenTier];
         uint256 totalCost = 0;
-        if (bytes(promo).length > 0) {
-            PromoCode memory promoCode = _promoCodes[promo];
-            require(promoCode.active == true, "PROMO_NOT_ACTIVE");
+
+        // Check promo code
+        PromoCode memory promoCode = _promoCode[promo];
+        if (promoCode.active) {
+            require(promoCode.tier == tokenTier, "PROMO_INVALID_TIER");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
-                "PROMO_MAX_REDEEMABLE_EXCEEDED"
+                "PROMO_MAX_REDEEMED"
             );
-            require(promoCode.tier == tokenTier, "PROMO_DOES_NOT_MATCH_TIER");
+
+            // Calculate total cost
             uint256 discountedPrice = (tier.price *
                 (100 - promoCode.discount)) / 100;
             totalCost = discountedPrice * tierSize;
@@ -534,16 +554,16 @@ contract ArchetypeAvatars is
                 "INSUFFICIENT_FUND"
             );
 
-            // Update Revenue
-            uint256 influencerReward = (discountedPrice *
-                promoCode.commission) / 100;
+            // Update Revenue and Infulencer reward
+            uint256 influencerReward = (totalCost * promoCode.commission) / 100;
 
-            _influencerBalances[promoCode.influencer] =
-                _influencerBalances[promoCode.influencer] +
+            _influencerRevenue[promoCode.influencer] =
+                _influencerRevenue[promoCode.influencer] +
                 influencerReward;
-
-            _promoCodes[promo].totalRedeemed += tierSize;
             _totalRevenue = _totalRevenue + (totalCost - influencerReward);
+
+            // Update Promo Redeemed
+            _promoCode[promo].totalRedeemed += tierSize;
         } else {
             // Update Revenue
             totalCost = tier.price * tierSize;
@@ -588,7 +608,7 @@ contract ArchetypeAvatars is
             uint256 tokenId = _maxTiers + (tier.supply * _maxTiers) + tierId;
             _safeMint(to, tokenId);
             tier.supply++;
-            _ownerTierTokens[to][tierId][
+            _ownerTierToken[to][tierId][
                 _ownerTierBalance[to][tierId]
             ] = tokenId;
             _ownerTierBalance[to][tierId]++;
@@ -600,8 +620,8 @@ contract ArchetypeAvatars is
         uint256 phase
     ) internal view returns (bool) {
         return
-            block.timestamp >= _sales[tierId][phase].saleStart &&
-            block.timestamp <= _sales[tierId][phase].saleEnd;
+            block.timestamp >= _sale[tierId][phase].saleStart &&
+            block.timestamp <= _sale[tierId][phase].saleEnd;
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
@@ -622,6 +642,10 @@ contract ArchetypeAvatars is
         return _treasury;
     }
 
+    function paymentToken() external view virtual returns (address) {
+        return _paymentToken;
+    }
+
     function totalRevenue() external view virtual returns (uint256) {
         return _totalRevenue;
     }
@@ -634,32 +658,60 @@ contract ArchetypeAvatars is
         return _totalTiers;
     }
 
-    function isSaleActive(
-        uint256 tierId,
-        uint256 phase
-    ) external view virtual returns (bool) {
-        return _isSaleActive(tierId, phase);
-    }
-
-    function paymentToken() external view virtual returns (address) {
-        return _paymentToken;
-    }
-
-    function influencerBalances(
+    function influencerRevenue(
         address influencer
     ) external view virtual returns (uint256) {
-        return _influencerBalances[influencer];
+        return _influencerRevenue[influencer];
     }
 
     function phaseWhitelisted(
         address wallet,
         uint256 tier,
         uint256 phase
-    ) external view virtual returns (PhaseWhiteList memory) {
-        return _phaseWhitelist[wallet][tier][phase];
+    )
+        external
+        view
+        virtual
+        returns (uint256 maxMint, uint256 discount, uint256 minted)
+    {
+        PhaseWhiteList storage phaseWhitelist = _phaseWhitelist[wallet][tier][
+            phase
+        ];
+        return (
+            phaseWhitelist.maxMint,
+            phaseWhitelist.discount,
+            phaseWhitelist.minted
+        );
     }
 
-    function tiers(
+    function promoInfo(
+        string memory promo
+    )
+        external
+        view
+        returns (
+            uint256 tier,
+            address influencer,
+            uint256 discount,
+            uint256 commission,
+            uint256 maxRedeemable,
+            uint256 totalRedeemed,
+            bool active
+        )
+    {
+        PromoCode storage promoCode = _promoCode[promo];
+        return (
+            promoCode.tier,
+            promoCode.influencer,
+            promoCode.discount,
+            promoCode.commission,
+            promoCode.maxRedeemable,
+            promoCode.totalRedeemed,
+            promoCode.active
+        );
+    }
+
+    function tierInfo(
         uint256 tierId
     ) external view returns (uint256 price, uint256 supply, uint256 maxSupply) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
@@ -667,12 +719,12 @@ contract ArchetypeAvatars is
         return (tier.price, tier.supply, tier.maxSupply);
     }
 
-    function sales(
+    function saleInfo(
         uint256 tierId,
         uint256 phase
     ) external view returns (uint256 saleStart, uint256 saleEnd) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
-        Sale storage sale = _sales[tierId][phase];
+        Sale storage sale = _sale[tierId][phase];
         return (sale.saleStart, sale.saleEnd);
     }
 
@@ -691,7 +743,7 @@ contract ArchetypeAvatars is
     ) external view returns (uint256) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(index < _ownerTierBalance[owner][tierId], "INVALID_INDEX");
-        return _ownerTierTokens[owner][tierId][index];
+        return _ownerTierToken[owner][tierId][index];
     }
 
     function balanceOfTier(
@@ -702,11 +754,11 @@ contract ArchetypeAvatars is
         return _ownerTierBalance[owner][tierId];
     }
 
-    function promoCodeInfo(
-        string memory promo
-    ) external view returns (PromoCode memory) {
-        PromoCode storage promoCode = _promoCodes[promo];
-        return promoCode;
+    function isSaleActive(
+        uint256 tierId,
+        uint256 phase
+    ) external view virtual returns (bool) {
+        return _isSaleActive(tierId, phase);
     }
 
     /**
