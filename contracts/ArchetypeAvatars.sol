@@ -58,8 +58,8 @@ contract ArchetypeAvatars is
     // SALES
     struct Sale {
         uint256 id;
-        uint256 saleStart;
-        uint256 saleEnd;
+        uint256 startTime;
+        uint256 endTime;
     }
     // Tier => Phase => Sale
     mapping(uint256 => mapping(uint256 => Sale)) private _sale;
@@ -75,7 +75,7 @@ contract ArchetypeAvatars is
         bool active;
     }
     mapping(string => PromoCode) private _promoCode;
-    mapping(address => uint256) public _influencerRevenue;
+    mapping(address => uint256) private _influencerRevenue;
 
     // WHITELIST
     struct PhaseWhiteList {
@@ -171,15 +171,15 @@ contract ArchetypeAvatars is
     function updateSale(
         uint256 tierId,
         uint256 phase,
-        uint256 saleStart,
-        uint256 saleEnd
+        uint256 startTime,
+        uint256 endTime
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(_sale[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
-        require(saleStart < saleEnd, "INVALID_SALE_TIME");
+        require(startTime < endTime, "INVALID_SALE_TIME");
 
-        _sale[tierId][phase].saleStart = saleStart;
-        _sale[tierId][phase].saleEnd = saleEnd;
+        _sale[tierId][phase].startTime = startTime;
+        _sale[tierId][phase].endTime = endTime;
     }
 
     function stopSale(
@@ -188,7 +188,7 @@ contract ArchetypeAvatars is
     ) external virtual onlyRole(MANAGER_ROLE) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(_sale[tierId][phase].id != 0, "SALE_NOT_INITIALIZED");
-        _sale[tierId][phase].saleEnd = block.timestamp;
+        _sale[tierId][phase].endTime = block.timestamp;
     }
 
     // Withdraw all amounts (revenue, influencer rewards, etc.)
@@ -210,8 +210,8 @@ contract ArchetypeAvatars is
         _totalRevenue = 0;
     }
 
-    // Withdraw influencer rewards
-    function withdrawInfluencerRewards(
+    // Withdraw influencer revenue
+    function withdrawInfluencerRevenue(
         address _infulencer
     ) external virtual nonReentrant {
         require(_influencerRevenue[_infulencer] > 0, "ZERO_BALANCE");
@@ -253,8 +253,8 @@ contract ArchetypeAvatars is
     */
     // PHASE 1: FREE CLAIMS - NETVRK NFT STAKERS
 
-    function initPhase1(
-        uint256 tokenTier,
+    function updatePhase1(
+        uint256 tierId,
         address[] memory recipients,
         uint256[] memory freeClaims,
         uint256 startTime,
@@ -264,24 +264,24 @@ contract ArchetypeAvatars is
             recipients.length == freeClaims.length,
             "INVALID_INPUT_LENGTHS"
         );
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_SALE_TIME");
         require(endTime > block.timestamp, "INVALID_SALE_TIME");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
-            _phaseWhitelist[recipients[idx]][tokenTier][1] = PhaseWhiteList(
+            _phaseWhitelist[recipients[idx]][tierId][1] = PhaseWhiteList(
                 freeClaims[idx],
                 0,
                 0
             );
         }
-        _sale[tokenTier][1] = Sale(tokenTier, startTime, endTime);
+        _sale[tierId][1] = Sale(tierId, startTime, endTime);
     }
 
     // PHASE 2: WHITELIST - NETVRK NFT STAKERS
 
-    function initPhase2(
-        uint256 tokenTier,
+    function updatePhase2(
+        uint256 tierId,
         address[] memory recipients,
         uint256[] memory freeClaims,
         uint256[] memory discounts,
@@ -293,56 +293,56 @@ contract ArchetypeAvatars is
             "INVALID_INPUT_LENGTHS"
         );
         require(recipients.length == discounts.length, "INVALID_INPUT_LENGTHS");
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_SALE_TIME");
         require(endTime > block.timestamp, "INVALID_SALE_TIME");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
-            _phaseWhitelist[recipients[idx]][tokenTier][2] = PhaseWhiteList(
+            _phaseWhitelist[recipients[idx]][tierId][2] = PhaseWhiteList(
                 freeClaims[idx],
                 discounts[idx],
                 0
             );
         }
-        _sale[tokenTier][2] = Sale(tokenTier, startTime, endTime);
+        _sale[tierId][2] = Sale(tierId, startTime, endTime);
     }
 
     // PHASE 3: WHITELIST - WHITELIST - PARTNER PROJECTS
 
-    function initPhase3(
-        uint256 tokenTier,
+    function updatePhase3(
+        uint256 tierId,
         address[] memory recipients,
         uint256 startTime,
         uint256 endTime,
         uint256 maxMint
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_SALE_TIME");
         require(endTime > block.timestamp, "INVALID_SALE_TIME");
         require(maxMint > 0, "INVALID_MAX_MINT");
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
-            _phaseWhitelist[recipients[idx]][tokenTier][3] = PhaseWhiteList(
+            _phaseWhitelist[recipients[idx]][tierId][3] = PhaseWhiteList(
                 maxMint,
                 0,
                 0
             );
         }
-        _sale[tokenTier][3] = Sale(tokenTier, startTime, endTime);
+        _sale[tierId][3] = Sale(tierId, startTime, endTime);
     }
 
     // PHASE 4: PUBLIC SALE
 
-    function initPhase4(
-        uint256 tokenTier,
+    function updatePhase4(
+        uint256 tierId,
         uint256 startTime,
         uint256 endTime
     ) external nonReentrant onlyRole(MANAGER_ROLE) {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         require(startTime < endTime, "INVALID_SALE_TIME");
         require(endTime > block.timestamp, "INVALID_SALE_TIME");
 
-        _sale[tokenTier][4] = Sale(tokenTier, startTime, endTime);
+        _sale[tierId][4] = Sale(tierId, startTime, endTime);
     }
 
     /*##################################################
@@ -362,11 +362,11 @@ contract ArchetypeAvatars is
 
         for (uint256 idx = 0; idx < recipients.length; idx++) {
             require(tierIds[idx] <= _totalTiers, "TIER_UNAVAILABLE");
-            require(tierSizes[idx] > 0, "INVALID_MAX_SUPPLY");
+            require(tierSizes[idx] > 0, "INVALID_SUPPLY");
             require(
                 _tier[tierIds[idx]].supply + tierSizes[idx] <=
                     _tier[tierIds[idx]].maxSupply,
-                "INVALID_MAX_SUPPLY"
+                "MAX_SUPPLY_EXCEEDED"
             );
             _mintTier(recipients[idx], tierIds[idx], tierSizes[idx]);
         }
@@ -375,48 +375,48 @@ contract ArchetypeAvatars is
     // PHASE 1: FREE CLAIMS - NETVRK NFT STAKERS
 
     function mintPhase1(
-        uint256 tokenTier,
+        uint256 tierId,
         uint256 tierSize
     ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier, 1), "SALE_NOT_ACTIVE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_isSaleActive(tierId, 1), "SALE_NOT_ACTIVE");
         require(
-            _phaseWhitelist[msg.sender][tokenTier][1].maxMint > 0,
+            _phaseWhitelist[msg.sender][tierId][1].maxMint > 0,
             "USER_NOT_WHITELISTED"
         );
         require(
-            _phaseWhitelist[msg.sender][tokenTier][1].minted + tierSize <=
-                _phaseWhitelist[msg.sender][tokenTier][1].maxMint,
+            _phaseWhitelist[msg.sender][tierId][1].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tierId][1].maxMint,
             "MAX_MINT_EXCEEDED"
         );
         // Update minted
-        _phaseWhitelist[msg.sender][tokenTier][1].minted += tierSize;
+        _phaseWhitelist[msg.sender][tierId][1].minted += tierSize;
 
         // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
+        _mintTier(msg.sender, tierId, tierSize);
     }
 
     // PHASE 2: WHITELIST - NETVRK NFT STAKERS
 
     function mintPhase2(
-        uint256 tokenTier,
+        uint256 tierId,
         uint256 tierSize
     ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier, 2), "SALE_NOT_ACTIVE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_isSaleActive(tierId, 2), "SALE_NOT_ACTIVE");
         require(
-            _phaseWhitelist[msg.sender][tokenTier][2].maxMint > 0,
+            _phaseWhitelist[msg.sender][tierId][2].maxMint > 0,
             "USER_NOT_WHITELISTED"
         );
         require(
-            _phaseWhitelist[msg.sender][tokenTier][2].minted + tierSize <=
-                _phaseWhitelist[msg.sender][tokenTier][2].maxMint,
+            _phaseWhitelist[msg.sender][tierId][2].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tierId][2].maxMint,
             "MAX_MINT_EXCEEDED"
         );
 
         // Calculate total cost
-        uint256 discount = _phaseWhitelist[msg.sender][tokenTier][2].discount;
-        Tier storage tier = _tier[tokenTier];
+        uint256 discount = _phaseWhitelist[msg.sender][tierId][2].discount;
+        Tier storage tier = _tier[tierId];
         uint256 discountedPrice = (tier.price * (100 - discount)) / 100;
         uint256 totalCost = discountedPrice * tierSize;
 
@@ -434,40 +434,40 @@ contract ArchetypeAvatars is
         );
 
         // Update Mint and revenue
-        _phaseWhitelist[msg.sender][tokenTier][2].minted += tierSize;
+        _phaseWhitelist[msg.sender][tierId][2].minted += tierSize;
         _totalRevenue = _totalRevenue + totalCost;
 
         // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
+        _mintTier(msg.sender, tierId, tierSize);
     }
 
     // PHASE 3: WHITELIST - WHITELIST - PARTNER PROJECTS
 
     function mintPhase3(
-        uint256 tokenTier,
+        uint256 tierId,
         uint256 tierSize,
         string memory promo
     ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier, 3), "SALE_NOT_ACTIVE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_isSaleActive(tierId, 3), "SALE_NOT_ACTIVE");
         require(
-            _phaseWhitelist[msg.sender][tokenTier][3].maxMint > 0,
+            _phaseWhitelist[msg.sender][tierId][3].maxMint > 0,
             "USER_NOT_WHITELISTED"
         );
         require(
-            _phaseWhitelist[msg.sender][tokenTier][3].minted + tierSize <=
-                _phaseWhitelist[msg.sender][tokenTier][3].maxMint,
+            _phaseWhitelist[msg.sender][tierId][3].minted + tierSize <=
+                _phaseWhitelist[msg.sender][tierId][3].maxMint,
             "MAX_MINT_EXCEEDED"
         );
 
         // Calculate total cost
-        Tier storage tier = _tier[tokenTier];
+        Tier storage tier = _tier[tierId];
         uint256 totalCost = 0;
 
         // Check Promo
         PromoCode memory promoCode = _promoCode[promo];
         if (promoCode.active) {
-            require(promoCode.tier == tokenTier, "PROMO_INVALID_TIER");
+            require(promoCode.tier == tierId, "PROMO_INVALID_TIER");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
                 "PROMO_MAX_REDEEMED"
@@ -514,30 +514,30 @@ contract ArchetypeAvatars is
         );
 
         // Update Mint
-        _phaseWhitelist[msg.sender][tokenTier][3].minted += tierSize;
+        _phaseWhitelist[msg.sender][tierId][3].minted += tierSize;
 
         // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
+        _mintTier(msg.sender, tierId, tierSize);
     }
 
     // PHASE 4: PUBLIC SALE
 
     function mintPhase4(
-        uint256 tokenTier,
+        uint256 tierId,
         uint256 tierSize,
         string memory promo
     ) external virtual nonReentrant {
-        require(tokenTier <= _totalTiers, "TIER_UNAVAILABLE");
-        require(_isSaleActive(tokenTier, 4), "SALE_NOT_ACTIVE");
+        require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
+        require(_isSaleActive(tierId, 4), "SALE_NOT_ACTIVE");
 
         // Calculate total cost
-        Tier storage tier = _tier[tokenTier];
+        Tier storage tier = _tier[tierId];
         uint256 totalCost = 0;
 
         // Check promo code
         PromoCode memory promoCode = _promoCode[promo];
         if (promoCode.active) {
-            require(promoCode.tier == tokenTier, "PROMO_INVALID_TIER");
+            require(promoCode.tier == tierId, "PROMO_INVALID_TIER");
             require(
                 promoCode.totalRedeemed + tierSize <= promoCode.maxRedeemable,
                 "PROMO_MAX_REDEEMED"
@@ -585,7 +585,7 @@ contract ArchetypeAvatars is
         );
 
         // Mint tier
-        _mintTier(msg.sender, tokenTier, tierSize);
+        _mintTier(msg.sender, tierId, tierSize);
     }
 
     /**
@@ -620,8 +620,8 @@ contract ArchetypeAvatars is
         uint256 phase
     ) internal view returns (bool) {
         return
-            block.timestamp >= _sale[tierId][phase].saleStart &&
-            block.timestamp <= _sale[tierId][phase].saleEnd;
+            block.timestamp >= _sale[tierId][phase].startTime &&
+            block.timestamp <= _sale[tierId][phase].endTime;
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
@@ -722,10 +722,10 @@ contract ArchetypeAvatars is
     function saleInfo(
         uint256 tierId,
         uint256 phase
-    ) external view returns (uint256 saleStart, uint256 saleEnd) {
+    ) external view returns (uint256 startTime, uint256 endTime) {
         require(tierId <= _totalTiers, "TIER_UNAVAILABLE");
         Sale storage sale = _sale[tierId][phase];
-        return (sale.saleStart, sale.saleEnd);
+        return (sale.startTime, sale.endTime);
     }
 
     function tierTokenByIndex(
