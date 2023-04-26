@@ -17,13 +17,13 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    // goerli: {
-    //   url: process.env.GOERLI_URL || "",
-    //   accounts:
-    //     process.env.PRIVATE_KEY_1 !== undefined
-    //       ? [process.env.PRIVATE_KEY_1]
-    //       : [],
-    // },
+    goerli: {
+      url: process.env.GOERLI_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY_1 !== undefined
+          ? [process.env.PRIVATE_KEY_1]
+          : [],
+    },
     mumbai: {
       url: process.env.MUMBAI_URL || "",
       accounts:
@@ -38,7 +38,8 @@ const config: HardhatUserConfig = {
     gasPrice: 21,
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || "",
+    // apiKey: process.env.ETHERSCAN_API_KEY || "",
+    apiKey: process.env.POLYGON_API_KEY || "",
   },
 };
 

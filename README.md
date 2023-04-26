@@ -3,6 +3,12 @@
 #### Goerli Network (Testnet)
 
 - Store Front: [0x994eA299D72F1B0690B3730E7dc7ce825a378046](https://goerli.etherscan.io/address/0x994eA299D72F1B0690B3730E7dc7ce825a378046)
+- NRGY: [0x34562283739db04b7eB67521BFb5C9118F0C0844](https://mumbai.polygonscan.com/address/0x34562283739db04b7eB67521BFb5C9118F0C0844)
+
+** Archetype Avatar **
+
+- [0x0fAd993f895F56F05bddFC4744Cd74B012512AdC](https://mumbai.polygonscan.com/address/0x0fAd993f895F56F05bddFC4744Cd74B012512AdC)
+- [0xF8d2aD3dD3D89C459C666756e599CF23941E82db](https://mumbai.polygonscan.com/address/0xF8d2aD3dD3D89C459C666756e599CF23941E82db)
 
 ### Documentation
 
