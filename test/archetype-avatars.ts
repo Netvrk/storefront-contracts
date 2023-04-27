@@ -262,20 +262,29 @@ describe("Archetype Avatars ", function () {
   });
 
   it("Add Promo Code", async function () {
-    await avatar.updatePromoCode(1, "xyz", infulencerAddress, 12, 10, 5, true);
+    await avatar.updatePromoCode(
+      1,
+      "xyz",
+      infulencerAddress,
+      12,
+      6,
+      10,
+      5,
+      true
+    );
     await expect(
-      avatar.updatePromoCode(2, "xyz", infulencerAddress, 12, 10, 5, true)
+      avatar.updatePromoCode(2, "xyz", infulencerAddress, 12, 6, 10, 5, true)
     ).to.be.revertedWith("TIER_UNAVAILABLE");
     await expect(
-      avatar.updatePromoCode(1, "", infulencerAddress, 12, 10, 5, true)
+      avatar.updatePromoCode(1, "", infulencerAddress, 12, 6, 10, 5, true)
     ).to.be.revertedWith("INVALID_PROMO_CODE");
 
     await expect(
-      avatar.updatePromoCode(1, "sx", infulencerAddress, 12, 100, 5, true)
+      avatar.updatePromoCode(1, "sx", infulencerAddress, 12, 6, 100, 5, true)
     ).to.be.revertedWith("INVALID_COMMISION");
 
     await expect(
-      avatar.updatePromoCode(1, "sx", infulencerAddress, 120, 10, 5, true)
+      avatar.updatePromoCode(1, "sx", infulencerAddress, 120, 6, 10, 5, true)
     ).to.be.revertedWith("INVALID_DISCOUNT");
 
     expect((await avatar.promoInfo("xyz")).active).to.be.true;
@@ -309,6 +318,7 @@ describe("Archetype Avatars ", function () {
       0,
       0,
       0,
+      0,
       false
     );
 
@@ -316,7 +326,16 @@ describe("Archetype Avatars ", function () {
   });
 
   it("Phase 4", async function () {
-    await avatar.updatePromoCode(1, "abc", infulencerAddress, 12, 10, 5, true);
+    await avatar.updatePromoCode(
+      1,
+      "abc",
+      infulencerAddress,
+      12,
+      6,
+      10,
+      5,
+      true
+    );
 
     const startTime = now;
     const endTime = now + 1000;

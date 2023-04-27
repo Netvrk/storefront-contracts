@@ -113,9 +113,9 @@
     }
   ],
   "impls": {
-    "2ef2b34d93e215bbd6112bbac105f6f15d807615148d58b8b4e41c173460a243": {
+    "41ad500b11a433025674c2fd2f3ca7433b033f3f1f0adbbbc8bb964137451017": {
       "address": "0x851356ae760d987E095750cCeb3bC6014560891C",
-      "txHash": "0x5b544da10e2f7df47be86fbce544d3704e861d77d148dbc12493a8caba8fc349",
+      "txHash": "0x411800d0282dd47d2be96d12764eec54a05876fef0eff2326bd8b2328580ee31",
       "layout": {
         "solcVersion": "0.8.17",
         "storage": [
@@ -340,7 +340,7 @@
             "label": "_tiers",
             "offset": 0,
             "slot": "406",
-            "type": "t_mapping(t_uint256,t_struct(Tier)19731_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Tier)19763_storage)",
             "contract": "StoreFront",
             "src": "contracts\\StoreFront.sol:130"
           },
@@ -348,7 +348,7 @@
             "label": "_sales",
             "offset": 0,
             "slot": "407",
-            "type": "t_mapping(t_uint256,t_struct(Sale)19738_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Sale)19770_storage)",
             "contract": "StoreFront",
             "src": "contracts\\StoreFront.sol:131"
           },
@@ -356,7 +356,7 @@
             "label": "_presales",
             "offset": 0,
             "slot": "408",
-            "type": "t_mapping(t_uint256,t_struct(PreSale)19747_storage)",
+            "type": "t_mapping(t_uint256,t_struct(PreSale)19779_storage)",
             "contract": "StoreFront",
             "src": "contracts\\StoreFront.sol:132"
           },
@@ -458,7 +458,7 @@
             "label": "mapping(uint256 => mapping(uint256 => uint256))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(PreSale)19747_storage)": {
+          "t_mapping(t_uint256,t_struct(PreSale)19779_storage)": {
             "label": "mapping(uint256 => struct StoreFront.PreSale)",
             "numberOfBytes": "32"
           },
@@ -466,11 +466,11 @@
             "label": "mapping(uint256 => struct ERC2981.RoyaltyInfo)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Sale)19738_storage)": {
+          "t_mapping(t_uint256,t_struct(Sale)19770_storage)": {
             "label": "mapping(uint256 => struct StoreFront.Sale)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Tier)19731_storage)": {
+          "t_mapping(t_uint256,t_struct(Tier)19763_storage)": {
             "label": "mapping(uint256 => struct StoreFront.Tier)",
             "numberOfBytes": "32"
           },
@@ -482,7 +482,7 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(PreSale)19747_storage": {
+          "t_struct(PreSale)19779_storage": {
             "label": "struct StoreFront.PreSale",
             "members": [
               {
@@ -548,7 +548,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(Sale)19738_storage": {
+          "t_struct(Sale)19770_storage": {
             "label": "struct StoreFront.Sale",
             "members": [
               {
@@ -572,7 +572,7 @@
             ],
             "numberOfBytes": "96"
           },
-          "t_struct(Tier)19731_storage": {
+          "t_struct(Tier)19763_storage": {
             "label": "struct StoreFront.Tier",
             "members": [
               {

@@ -68,7 +68,8 @@ contract ArchetypeAvatars is
     struct PromoCode {
         uint256 tier;
         address influencer;
-        uint256 discount;
+        uint256 discountPhase3;
+        uint256 discountPhase4;
         uint256 commission;
         uint256 maxRedeemable;
         uint256 totalRedeemed;
@@ -226,20 +227,23 @@ contract ArchetypeAvatars is
         uint256 tier,
         string memory promo,
         address infuencer,
-        uint256 discount,
+        uint256 discountPhase3,
+        uint256 discountPhase4,
         uint256 commission,
         uint256 maxRedeemable,
         bool active
     ) external virtual onlyRole(MANAGER_ROLE) nonReentrant {
         require(tier <= _totalTiers, "TIER_UNAVAILABLE");
         require(bytes(promo).length > 0, "INVALID_PROMO_CODE");
-        require(discount < 100, "INVALID_DISCOUNT");
+        require(discountPhase3 < 100, "INVALID_DISCOUNT");
+        require(discountPhase4 < 100, "INVALID_DISCOUNT");
         require(commission < 100, "INVALID_COMMISION");
 
         _promoCode[promo] = PromoCode(
             tier,
             infuencer,
-            discount,
+            discountPhase3,
+            discountPhase4,
             commission,
             maxRedeemable,
             _promoCode[promo].totalRedeemed,
@@ -475,7 +479,7 @@ contract ArchetypeAvatars is
 
             // Calculate total cost
             uint256 discountedPrice = (tier.price *
-                (100 - promoCode.discount)) / 100;
+                (100 - promoCode.discountPhase3)) / 100;
             totalCost = discountedPrice * tierSize;
 
             // Check if fund is sufficient
@@ -545,7 +549,7 @@ contract ArchetypeAvatars is
 
             // Calculate total cost
             uint256 discountedPrice = (tier.price *
-                (100 - promoCode.discount)) / 100;
+                (100 - promoCode.discountPhase4)) / 100;
             totalCost = discountedPrice * tierSize;
 
             // Check if fund is sufficient
@@ -692,7 +696,8 @@ contract ArchetypeAvatars is
         returns (
             uint256 tier,
             address influencer,
-            uint256 discount,
+            uint256 discountPhase3,
+            uint256 discountPhase4,
             uint256 commission,
             uint256 maxRedeemable,
             uint256 totalRedeemed,
@@ -703,7 +708,8 @@ contract ArchetypeAvatars is
         return (
             promoCode.tier,
             promoCode.influencer,
-            promoCode.discount,
+            promoCode.discountPhase3,
+            promoCode.discountPhase4,
             promoCode.commission,
             promoCode.maxRedeemable,
             promoCode.totalRedeemed,
