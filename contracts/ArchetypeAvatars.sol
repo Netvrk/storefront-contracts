@@ -3,14 +3,13 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 /*
 PHASES:
@@ -445,7 +444,7 @@ contract ArchetypeAvatars is
         _mintTier(msg.sender, tierId, tierSize);
     }
 
-    // PHASE 3: WHITELIST - WHITELIST - PARTNER PROJECTS
+    // PHASE 3: WHITELIST - PARTNER PROJECTS
 
     function mintPhase3(
         uint256 tierId,
