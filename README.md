@@ -10,7 +10,7 @@
 
 **Archetype Avatar**
 
-- Archetype Avatar: [0x24371B215Cc99D15dc8DdDe4D428e87965E005af](https://mumbai.polygonscan.com/address/0x24371B215Cc99D15dc8DdDe4D428e87965E005af)
+- Archetype Avatar: [0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3](https://mumbai.polygonscan.com/address/0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3)
 
 ### Documentation
 

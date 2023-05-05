@@ -6,8 +6,8 @@ async function main() {
   const paymentToken = "0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56";
 
   const aa = await aaContract.deploy(
-    "AA",
-    "AA",
+    "XCX",
+    "XCX",
     "https://api.example.com/",
     owner,
     owner,
