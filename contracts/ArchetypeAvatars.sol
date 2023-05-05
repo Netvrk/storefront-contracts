@@ -4,7 +4,6 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
@@ -26,8 +25,6 @@ contract ArchetypeAvatars is
     ReentrancyGuard,
     ERC721Enumerable
 {
-    using MerkleProof for bytes32[];
-
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -145,7 +142,7 @@ contract ArchetypeAvatars is
         uint256 price,
         uint256 maxSupply
     ) external virtual onlyRole(MANAGER_ROLE) {
-        require(id <= _maxTiers, "TIER_UNAVAILABLE");
+        require(id < _maxTiers, "TIER_UNAVAILABLE");
         require(_tier[id].id == 0, "TIER_ALREADY_INITIALIZED");
         require(maxSupply > 0, "INVALID_MAX_SUPPLY");
 
