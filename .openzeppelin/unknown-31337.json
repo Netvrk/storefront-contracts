@@ -108,14 +108,14 @@
     },
     {
       "address": "0xf5059a5D33d5853360D16C683c16e67980206f36",
-      "txHash": "0x03537d3b347adc6e63a9b8f3a59d53192c7733c90bfab8c6b815f0775000d9f9",
+      "txHash": "0xc567c88d91d7cb96140ca43490c7f4e2cc804190c57a6554b6af8f65843b414b",
       "kind": "uups"
     }
   ],
   "impls": {
-    "41ad500b11a433025674c2fd2f3ca7433b033f3f1f0adbbbc8bb964137451017": {
+    "19b75b601d0eb4b58403b8fdf31081b7df81a749ce96b8ce54a3c03e5464650d": {
       "address": "0x851356ae760d987E095750cCeb3bC6014560891C",
-      "txHash": "0x411800d0282dd47d2be96d12764eec54a05876fef0eff2326bd8b2328580ee31",
+      "txHash": "0x6411feb647abd8798486b95bfa5091b4d700cdebca00385a1ea5c3b3a509ec3a",
       "layout": {
         "solcVersion": "0.8.17",
         "storage": [
@@ -318,7 +318,7 @@
             "slot": "403",
             "type": "t_address",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:104"
+            "src": "contracts\\StoreFront.sol:24"
           },
           {
             "label": "_tokenBaseURI",
@@ -326,7 +326,7 @@
             "slot": "404",
             "type": "t_string_storage",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:105"
+            "src": "contracts\\StoreFront.sol:25"
           },
           {
             "label": "_contractURI",
@@ -334,31 +334,31 @@
             "slot": "405",
             "type": "t_string_storage",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:106"
+            "src": "contracts\\StoreFront.sol:26"
           },
           {
             "label": "_tiers",
             "offset": 0,
             "slot": "406",
-            "type": "t_mapping(t_uint256,t_struct(Tier)19763_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Tier)13971_storage)",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:130"
+            "src": "contracts\\StoreFront.sol:50"
           },
           {
             "label": "_sales",
             "offset": 0,
             "slot": "407",
-            "type": "t_mapping(t_uint256,t_struct(Sale)19770_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Sale)13978_storage)",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:131"
+            "src": "contracts\\StoreFront.sol:51"
           },
           {
             "label": "_presales",
             "offset": 0,
             "slot": "408",
-            "type": "t_mapping(t_uint256,t_struct(PreSale)19779_storage)",
+            "type": "t_mapping(t_uint256,t_struct(PreSale)13987_storage)",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:132"
+            "src": "contracts\\StoreFront.sol:52"
           },
           {
             "label": "_ownerTierBalance",
@@ -366,7 +366,7 @@
             "slot": "409",
             "type": "t_mapping(t_address,t_mapping(t_uint256,t_uint256))",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:134"
+            "src": "contracts\\StoreFront.sol:54"
           },
           {
             "label": "_ownerTierTokens",
@@ -374,7 +374,7 @@
             "slot": "410",
             "type": "t_mapping(t_address,t_mapping(t_uint256,t_mapping(t_uint256,t_uint256)))",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:135"
+            "src": "contracts\\StoreFront.sol:55"
           },
           {
             "label": "_totalRevenue",
@@ -382,7 +382,7 @@
             "slot": "411",
             "type": "t_uint256",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:137"
+            "src": "contracts\\StoreFront.sol:57"
           },
           {
             "label": "_totalTiers",
@@ -390,7 +390,7 @@
             "slot": "412",
             "type": "t_uint256",
             "contract": "StoreFront",
-            "src": "contracts\\StoreFront.sol:139"
+            "src": "contracts\\StoreFront.sol:59"
           }
         ],
         "types": {
@@ -458,7 +458,7 @@
             "label": "mapping(uint256 => mapping(uint256 => uint256))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(PreSale)19779_storage)": {
+          "t_mapping(t_uint256,t_struct(PreSale)13987_storage)": {
             "label": "mapping(uint256 => struct StoreFront.PreSale)",
             "numberOfBytes": "32"
           },
@@ -466,11 +466,11 @@
             "label": "mapping(uint256 => struct ERC2981.RoyaltyInfo)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Sale)19770_storage)": {
+          "t_mapping(t_uint256,t_struct(Sale)13978_storage)": {
             "label": "mapping(uint256 => struct StoreFront.Sale)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Tier)19763_storage)": {
+          "t_mapping(t_uint256,t_struct(Tier)13971_storage)": {
             "label": "mapping(uint256 => struct StoreFront.Tier)",
             "numberOfBytes": "32"
           },
@@ -482,7 +482,7 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(PreSale)19779_storage": {
+          "t_struct(PreSale)13987_storage": {
             "label": "struct StoreFront.PreSale",
             "members": [
               {
@@ -548,7 +548,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(Sale)19770_storage": {
+          "t_struct(Sale)13978_storage": {
             "label": "struct StoreFront.Sale",
             "members": [
               {
@@ -572,7 +572,7 @@
             ],
             "numberOfBytes": "96"
           },
-          "t_struct(Tier)19763_storage": {
+          "t_struct(Tier)13971_storage": {
             "label": "struct StoreFront.Tier",
             "members": [
               {

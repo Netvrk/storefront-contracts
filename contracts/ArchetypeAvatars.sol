@@ -84,6 +84,30 @@ contract ArchetypeAvatars is
     mapping(address => mapping(uint256 => mapping(uint256 => PhaseWhiteList)))
         private _phaseWhitelist;
 
+    // Phase Mint Events
+    event Phase1Minted(
+        address indexed to,
+        uint256 indexed tierId,
+        uint256 tierSize
+    );
+    event Phase2Minted(
+        address indexed to,
+        uint256 indexed tierId,
+        uint256 tierSize
+    );
+    event Phase3Minted(
+        address indexed to,
+        uint256 indexed tierId,
+        uint256 tierSize,
+        string indexed promo
+    );
+    event Phase4Minted(
+        address indexed to,
+        uint256 indexed tierId,
+        uint256 tierSize,
+        string indexed promo
+    );
+
     constructor(
         string memory name_,
         string memory symbol_,
@@ -394,6 +418,9 @@ contract ArchetypeAvatars is
 
         // Mint tier
         _mintTier(msg.sender, tierId, tierSize);
+
+        // Emit event
+        emit Phase1Minted(msg.sender, tierId, tierSize);
     }
 
     // PHASE 2: WHITELIST - NETVRK NFT STAKERS
@@ -439,6 +466,9 @@ contract ArchetypeAvatars is
 
         // Mint tier
         _mintTier(msg.sender, tierId, tierSize);
+
+        // Emit event
+        emit Phase2Minted(msg.sender, tierId, tierSize);
     }
 
     // PHASE 3: WHITELIST - PARTNER PROJECTS
@@ -518,6 +548,9 @@ contract ArchetypeAvatars is
 
         // Mint tier
         _mintTier(msg.sender, tierId, tierSize);
+
+        // Emit event
+        emit Phase3Minted(msg.sender, tierId, tierSize, promo);
     }
 
     // PHASE 4: PUBLIC SALE
@@ -586,6 +619,9 @@ contract ArchetypeAvatars is
 
         // Mint tier
         _mintTier(msg.sender, tierId, tierSize);
+
+        // Emit event
+        emit Phase4Minted(msg.sender, tierId, tierSize, promo);
     }
 
     /**
