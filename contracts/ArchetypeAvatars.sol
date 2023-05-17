@@ -820,4 +820,21 @@ contract ArchetypeAvatars is
         }
         return super.supportsInterface(interfaceId);
     }
+
+    // Tokens locked until June 7, 2023 at 1pm EDT
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    )   internal
+        virtual
+        override 
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        if (from != address(0)) 
+        {
+            require(block.timestamp > 1686157200, "LOCKED_UNTIL_2023-06-07");
+        }
+    }
 }
