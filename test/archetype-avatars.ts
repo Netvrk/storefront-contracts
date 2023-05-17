@@ -193,6 +193,13 @@ describe("Archetype Avatars ", function () {
     expect(userPhaseWhitelisted.minted.toString()).to.be.equal("2");
   });
 
+  it("Pre: Test transfer lock", async function () {
+    const tokenId = await avatar.tokenOfOwnerByIndex(userAddress, 0);
+    await expect(
+      avatar.connect(user).transferFrom(userAddress, user2Address, tokenId)
+    ).to.be.revertedWith("LOCKED_UNTIL_2023-06-07");
+  });
+
   it("Phase 2", async function () {
     const startTime = now;
     const endTime = now + 1000;
@@ -398,6 +405,12 @@ describe("Archetype Avatars ", function () {
         [1, 1, 1],
         [5, 5, 5]
       );
+  });
+
+  it("Post: Test transfer lock", async function () {
+    now = await time.increase(86400 * 25);
+    const tokenId = await avatar.tokenOfOwnerByIndex(userAddress, 0);
+    await avatar.connect(user).transferFrom(userAddress, user2Address, tokenId);
   });
 
   it("Withdraw", async function () {
