@@ -233,14 +233,14 @@ contract ArchetypeAvatars is
 
     // Withdraw influencer revenue
     function withdrawInfluencerRevenue(
-        address _infulencer
+        address _influencer
     ) external virtual nonReentrant {
-        require(_influencerRevenue[_infulencer] > 0, "ZERO_BALANCE");
+        require(_influencerRevenue[_influencer] > 0, "ZERO_BALANCE");
         IERC20(_paymentToken).transfer(
-            _infulencer,
-            _influencerRevenue[_infulencer]
+            _influencer,
+            _influencerRevenue[_influencer]
         );
-        _influencerRevenue[_infulencer] = 0;
+        _influencerRevenue[_influencer] = 0;
     }
 
     function updatePromoCode(
@@ -587,7 +587,7 @@ contract ArchetypeAvatars is
                 "INSUFFICIENT_FUND"
             );
 
-            // Update Revenue and Infulencer reward
+            // Update Revenue and Influencer reward
             uint256 influencerReward = (totalCost * promoCode.commission) / 100;
 
             _influencerRevenue[promoCode.influencer] =
