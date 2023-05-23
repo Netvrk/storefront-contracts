@@ -246,7 +246,7 @@ contract ArchetypeAvatars is
     function updatePromoCode(
         uint256 tier,
         string memory promo,
-        address infuencer,
+        address influencer,
         uint256 discountPhase3,
         uint256 discountPhase4,
         uint256 commission,
@@ -261,7 +261,7 @@ contract ArchetypeAvatars is
 
         _promoCode[promo] = PromoCode(
             tier,
-            infuencer,
+            influencer,
             discountPhase3,
             discountPhase4,
             commission,
@@ -827,13 +827,9 @@ contract ArchetypeAvatars is
         address to,
         uint256 tokenId,
         uint256 batchSize
-    )   internal
-        virtual
-        override 
-    {
+    ) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        if (from != address(0)) 
-        {
+        if (from != address(0)) {
             require(block.timestamp > 1686157200, "LOCKED_UNTIL_2023-06-07");
         }
     }
