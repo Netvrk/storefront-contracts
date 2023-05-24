@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 
-// import "hardhat/console.sol";
-
 /*
 PHASES:
 Phase 0: Airdrop

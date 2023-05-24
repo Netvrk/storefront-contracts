@@ -408,7 +408,7 @@ describe("Archetype Avatars ", function () {
   });
 
   it("Post: Test transfer lock", async function () {
-    now = await time.increase(86400 * 25);
+    now = await time.increase(86400 * 15); // after 15 days
     const tokenId = await avatar.tokenOfOwnerByIndex(userAddress, 0);
     await avatar.connect(user).transferFrom(userAddress, user2Address, tokenId);
   });

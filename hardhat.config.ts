@@ -31,6 +31,14 @@ const config: HardhatUserConfig = {
           ? [process.env.PRIVATE_KEY_1]
           : [],
     },
+    polygon: {
+      url: process.env.POLYGON_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY_1 !== undefined
+          ? [process.env.PRIVATE_KEY_1]
+          : [],
+      // gasPrice: 100,
+    },
   },
   gasReporter: {
     enabled: false,

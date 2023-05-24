@@ -2,14 +2,18 @@ const hre = require("hardhat");
 
 async function main() {
   const aaContract = await hre.ethers.getContractFactory("ArchetypeAvatars");
-  const owner = "0xF3d66FFc6E51db57A4d8231020F373A14190567F";
-  const paymentToken = "0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56";
+
+  const owner = "0x0417fb78c0aC3fc728C13bE94d606B36f3486A01";
+
+  const treasury = "0xfdAb64Dd15434aFa0F4f13cc89E4D96f62B54232";
+
+  const paymentToken = "0x73A4dC4215Dc3eb6AaE3C7AaFD2514cB34e5D983";
 
   const aa = await aaContract.deploy(
-    "XCX",
-    "XCX",
-    "https://api.example.com/",
-    owner,
+    "NetvrkArchetypeAvatars",
+    "NVKAA",
+    "https://api.netvrk.co/api/avatar/archetypes/",
+    treasury,
     owner,
     paymentToken
   );
