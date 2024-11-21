@@ -1,18 +1,31 @@
-# Store Front Contract
+# Store Front Contracts
 
-#### Goerli Network (Testnet)
+The **Store Front Contracts** project is a comprehensive suite of smart contracts that facilitate the sale and distribution of NFTs (Non-Fungible Tokens) on the EVM (Ethereum Virtual Machine) blockchain. The primary purpose of these contracts is to manage the minting, sale, and distribution of both **Netvrk Native** NFTs and NFTs from **Partner NFT projects**.
 
-- Store Front: [0x994eA299D72F1B0690B3730E7dc7ce825a378046](https://goerli.etherscan.io/address/0x994eA299D72F1B0690B3730E7dc7ce825a378046)
+### Key functionalities include:
 
-**Token Contracts**
+1. **NFT Tier Management**:
+   - The contracts handle different tiers or categories of NFTs, allowing for a structured pricing and availability system. This can include exclusive or limited-edition NFTs available at different price points.
+2. **Presale and Public Sale Management**:
 
-- NRGY: [0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56](https://mumbai.polygonscan.com/address/0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56)
+   - The contracts offer separate mechanisms for presale and public sales, enabling controlled access to certain NFTs before they are publicly available. This allows projects to reward early adopters or offer special incentives for presale participants.
 
-**Archetype Avatar**
+3. **Airdrops**:
 
-- Archetype Avatar: [0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3](https://mumbai.polygonscan.com/address/0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3)
+   - The system supports the airdropping of NFTs to specific addresses. This can be useful for rewarding loyal users, incentivizing actions, or promoting a new NFT collection to targeted audiences.
 
-### Documentation
+4. **Fund Withdrawals**:
+   - The contracts also manage the process of withdrawing funds generated from NFT sales. Funds can be transferred to a designated treasury or wallet, which is typically controlled by the project's admin or development team.
+
+In essence, these contracts create a streamlined, secure, and automated framework for launching and managing NFT projects on the blockchain, making it easier for both creators and buyers to interact with and participate in NFT sales.
+
+## Goerli Network (Testnet)
+
+- **Store Front:** [0x994eA299D72F1B0690B3730E7dc7ce825a378046](https://goerli.etherscan.io/address/0x994eA299D72F1B0690B3730E7dc7ce825a378046)
+- **NRGY:** [0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56](https://mumbai.polygonscan.com/address/0xF5B84B4F60F47616e79d7a46d43706B90AdD1e56)
+- **Archetype Avatar:** [0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3](https://mumbai.polygonscan.com/address/0xA1cc025c4a606af35bb9f3b5Bc097eF117706af3)
+
+### Specification
 
 #### Tiers
 
